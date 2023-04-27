@@ -3,11 +3,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Properties;
+import java.util.*;
 import java.sql.*;
-import java.util.Random;
 
 import com.alibaba.fastjson.JSON;
 
@@ -30,7 +27,8 @@ public class Loader2 {
     static int cnt = 0;
     static int replyId = 1;
     static int secondReplyId = 1;
-    static HashMap<Integer,String> PostTimeMap = new HashMap<>();
+    static HashMap<Integer, String> PostTimeMap = new HashMap<>();
+
     private static void openDB(Properties prop) {
         try {
             Class.forName("org.postgresql.Driver");
@@ -97,6 +95,7 @@ public class Loader2 {
             throw new RuntimeException(e);
         }
     }
+
     private static void loadAuthor(Post a) {
         if (con != null) {
             try {
@@ -111,6 +110,7 @@ public class Loader2 {
             }
         }
     }
+
     private static void loadPost(Post a) {
         if (con != null) {
             try {
@@ -120,7 +120,7 @@ public class Loader2 {
                 stmtPost.setString(4, a.getPostingTime());
                 stmtPost.setString(5, a.getPostingCity());
                 stmtPost.setString(6, a.getAuthor());
-                PostTimeMap.put(a.getPostID(),a.getPostingTime());
+                PostTimeMap.put(a.getPostID(), a.getPostingTime());
                 cnt++;
                 stmtPost.addBatch();
             } catch (SQLException e) {
@@ -214,7 +214,6 @@ public class Loader2 {
 //    }
 
 
-
     public static String GeneratePhone() {
         int length = 10;
         String digits = "0123456789";
@@ -244,9 +243,9 @@ public class Loader2 {
         return randomString;
     }
 
-    public static void loadReply(Replies r){
-        if(con!=null){
-            try{
+    public static void loadReply(Replies r) {
+        if (con != null) {
+            try {
                 stmtReply.setInt(1, replyId);
                 stmtReply.setInt(2, r.getPostID());
                 stmtReply.setString(3, r.getReplyContent());
@@ -259,7 +258,7 @@ public class Loader2 {
                 stmtReply.addBatch();
                 replyId++;
                 cnt++;
-            }catch (SQLException e){
+            } catch (SQLException e) {
                 throw new RuntimeException(e);
             }
         }
@@ -278,7 +277,7 @@ public class Loader2 {
                 stmtSecondReply.setString(4, r.getSecondaryReplyContent());
                 stmtSecondReply.addBatch();
                 cnt++;
-                stmtReToSecRe.setInt(1, findReply(r.getReplyContent(),r.getReplyStars(),r.getReplyAuthor()));
+                stmtReToSecRe.setInt(1, findReply(r.getReplyContent(), r.getReplyStars(), r.getReplyAuthor()));
                 stmtReToSecRe.setInt(2, secondReplyId);
                 stmtReToSecRe.addBatch();
                 cnt++;
@@ -289,13 +288,13 @@ public class Loader2 {
         }
     }
 
-    public static int findReply(String content,int stars,String author_name){
+    public static int findReply(String content, int stars, String author_name) {
         String sql = "SELECT reply_id FROM replies WHERE content = ? and stars = ? and author_name = ?;";
         try {
             PreparedStatement ps = con.prepareStatement(sql);
-            ps.setString(1,content );
-            ps.setInt(2,stars);
-            ps.setString(3,author_name);
+            ps.setString(1, content);
+            ps.setInt(2, stars);
+            ps.setString(3, author_name);
             ResultSet rs = ps.executeQuery();
             rs.next();
             return rs.getInt("reply_id");
@@ -323,6 +322,7 @@ public class Loader2 {
 
 
     public static void main(String[] args) {
+        Scanner in = new Scanner(System.in);
         Properties prop = loadDBUser();
         long start = 0;
         long end = 0;
@@ -334,40 +334,43 @@ public class Loader2 {
             start = System.currentTimeMillis();
             openDB(prop);
             setPrepareStatement();
-            for (int i = 0; i < posts.size(); i++) {
-                Post a = posts.get(i);
-                loadPost(a);
-                loadAuthor(a);
+            /*
+            * 用户权限，
+            *
+            *
+            *
+            * */
+
+
+            while (true) {
+                String a = in.next(); //命令 ：reg author_name password
+                while (a.equalsIgnoreCase("quit")) {
+                    String[] cmd = a.split(" ");
+                    switch (cmd[0]) {
+                        case "reg"://reg author_name
+
+                        case "like"://like post_id
+
+                        case "favorite"://favorite post_id
+
+                        case "reply"://reply post_id content
+
+                        case "post"://post content
+
+                        case "share"://share post_id
+
+                        case "checklist"://checklist follow or like or.....
+
+                        case "follow"://follow author_name
+
+                        case "login"://login author_name
+
+                        case "search"://search for post / author /
+                    }
+                }
             }
-            stmtAuthor.executeBatch();
-            stmtPost.executeBatch();
-            for (int i = 0; i < posts.size(); i++) {
-                Post a = posts.get(i);
-                loadPostData(a);
-            }
-            stmtAuthor.executeBatch();
-            stmtFollow.executeBatch();
-            stmtFavr.executeBatch();
-            stmtShare.executeBatch();
-            stmtLike.executeBatch();
-            stmtCate.executeBatch();
-            con.commit();
-            for (int i = 0; i < replies.size(); i++) {
-                Replies r = replies.get(i);
-                loadReply(r);
-            }
-            stmtAuthor.executeBatch();
-            stmtReply.executeBatch();
-            for (int i = 0; i < replies.size(); i++) {
-                Replies r = replies.get(i);
-                loadSecondReplies(r);
-            }
-            stmtAuthor.executeBatch();
-            stmtSecondReply.executeBatch();
-            stmtReToSecRe.executeBatch();
-            end = System.currentTimeMillis();
-            con.commit();
-            con.close();
+
+            closeDB();
         } catch (SQLException e) {
             throw new RuntimeException(e);
         } catch (IOException e) {
