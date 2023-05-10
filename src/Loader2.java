@@ -210,10 +210,6 @@ public class Loader2 {
         return randomDateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
     }
 
-//    public static String GenerateAuthorId(String timestampString) {
-//    }
-
-
     public static String GeneratePhone() {
         int length = 10;
         String digits = "0123456789";
@@ -320,7 +316,6 @@ public class Loader2 {
         }
     }
 
-
     public static void main(String[] args) {
         Scanner in = new Scanner(System.in);
         Properties prop = loadDBUser();
@@ -335,51 +330,155 @@ public class Loader2 {
             openDB(prop);
             setPrepareStatement();
             /*
-            * 用户权限，
-            *
-            *
-            *
-            * */
-
-
+             * 用户权限
+             *
+             *
+             *
+             * */
+            boolean isInputName = false;
+            boolean isLogin = false;
+            String authorName = "";
+            String authorId = "";
+            String authorPhone = "";
+            String author_registration_time = "";
+            String password = "";
             while (true) {
+                String sql = "";
                 String a = in.next(); //命令 ：reg author_name password
                 while (a.equalsIgnoreCase("quit")) {
-                    String[] cmd = a.split(" ");
-                    switch (cmd[0]) {
+                    String[] cmd = a.trim().split(" ");
+                    switch (cmd[0].toLowerCase(Locale.ROOT)) {
                         case "reg"://reg author_name
 
+                            break;
                         case "like"://like post_id
 
+                            break;
                         case "favorite"://favorite post_id
+                            break;
 
                         case "reply"://reply post_id content
+                            break;
 
                         case "post"://post content
+                            break;
 
-                        case "share"://share post_id
+                        case "share": {
+                            //share post_id
 
-                        case "checklist"://checklist follow or like or.....
 
-                        case "follow"://follow author_name
+                            break;
 
-                        case "login"://login author_name
 
+                        }
+
+
+                        case "checklist": {
+                            //checklist follow or like or.....
+                            String type = cmd[1];
+                            switch (type) {
+                                case "follow": {
+                                    sql = "select *\n" +
+                                            "from author_followed\n" +
+                                            "where author_name = ?;";
+                                    PreparedStatement ps = con.prepareStatement(sql);
+                                    ps.setString(1, authorName);
+                                    ResultSet rs = ps.executeQuery();
+                                    if (rs.next()) {
+                                        System.out.println("author_name" + "     " + "author_id");
+                                        System.out.println(rs.getString("author_name") + "     " + rs.getString("author_id"));
+                                        while (rs.next()) {
+                                            System.out.println(rs.getString("author_name") + "     " + rs.getString("author_id"));
+                                        }
+                                    } else {
+                                        System.out.println("you don't follow any other authors");
+                                    }
+                                    break;
+                                }
+                                case "like": {
+                                    sql = "select *\n" +
+                                            "from like_post\n" +
+                                            "where author_name = ?;";
+                                    PreparedStatement ps = con.prepareStatement(sql);
+                                    ps.setString(1, authorName);
+                                    ResultSet rs = ps.executeQuery();
+                                    if (rs.next()) {
+                                        System.out.println("post_id");
+                                        System.out.println(rs.getInt("post_id"));
+                                        while (rs.next()) {
+                                            System.out.println(rs.getInt("post_id"));
+                                        }
+                                    } else {
+                                        System.out.println("you don't like any posts");
+                                    }
+                                    break;
+                                }
+                            }
+
+                            break;
+                        }
+                        case "follow": {
+                            //follow author_name
+                            //判断author是否存在
+                            sql = "SELECT *\n" +
+                                    "from authors\n" +
+                                    "where author_name = ?;";
+                            PreparedStatement ps = con.prepareStatement(sql);
+                            ps.setString(1, cmd[1]);
+                            ResultSet rs = ps.executeQuery();
+                            if (rs.next()) {
+                                stmtFollow.setString(1, authorName);
+                                stmtFollow.setString(2, cmd[1]);
+                                stmtFollow.addBatch();
+                                stmtAuthor.executeBatch();
+                            } else {
+                                System.out.println("this author doesn't exist");
+                            }
+                            break;
+                        }
+                        case "login": {
+                            //login author_name
+                            authorName = cmd[1];
+                            sql = "SELECT *\n" +
+                                    "from authors\n" +
+                                    "where author_name = ?;";
+                            PreparedStatement ps = con.prepareStatement(sql);
+                            ps.setString(1, authorName);
+                            ResultSet rs = ps.executeQuery();
+                            if (rs.next()) {
+                                password = rs.getString("password");
+                                isInputName = true;
+                            } else {
+                                System.out.println("author isn't existing.Please register first");
+                            }
+                            break;
+                        }
+
+                        case "pw": {
+                            //pw password
+                            if (isInputName) {
+                                if (Objects.equals(password, cmd[1])) {
+                                    isLogin = true;
+                                } else {
+                                    System.out.println("password is wrong");
+                                }
+                            }
+                            break;
+                        }
                         case "search"://search for post / author /
                     }
                 }
             }
 
-            closeDB();
         } catch (SQLException e) {
             throw new RuntimeException(e);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-        closeDB();
-        System.out.println(cnt + " records successfully loaded");
-        System.out.println(end - start);
-        System.out.println("Loading speed : " + (cnt * 1000L) / (end - start) + " records/s");
+//        closeDB();
+//        System.out.println(cnt + " records successfully loaded");
+//        System.out.println(end - start);
+//        System.out.println("Loading speed : " + (cnt * 1000L) / (end - start) + " records/s");
     }
 
 
