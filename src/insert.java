@@ -3,14 +3,17 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
-import java.util.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Properties;
 import java.sql.*;
+import java.util.Random;
 
 import com.alibaba.fastjson.JSON;
 
 import java.util.concurrent.ThreadLocalRandom;
 
-public class Loader2 {
+public class insert {
     private static final int BATCH_SIZE = 1000;
     private static Connection con = null;
     private ResultSet resultSet;
@@ -27,8 +30,7 @@ public class Loader2 {
     static int cnt = 0;
     static int replyId = 1;
     static int secondReplyId = 1;
-    static HashMap<Integer, String> PostTimeMap = new HashMap<>();
-
+    static HashMap<Integer,String> PostTimeMap = new HashMap<>();
     private static void openDB(Properties prop) {
         try {
             Class.forName("org.postgresql.Driver");
@@ -36,7 +38,7 @@ public class Loader2 {
             System.err.println("Cannot find the Postgres driver. Check CLASSPATH.");
             System.exit(1);
         }
-        String url = "jdbc:postgresql://" + prop.getProperty("host") + "/" + prop.getProperty("database");
+        String url = "jdbc:postgresql://" + prop.getProperty("host") + "/" + prop.getProperty("database")+"?characterEncoding=UTF-8";
         try {
             con = DriverManager.getConnection(url, prop);
             if (con != null) {
@@ -95,12 +97,11 @@ public class Loader2 {
             throw new RuntimeException(e);
         }
     }
-
     private static void loadAuthor(Post a) {
         if (con != null) {
             try {
                 stmtAuthor.setString(1, a.getAuthorID());
-                stmtAuthor.setString(2, a.getAuthorRegistrationTime());
+                stmtAuthor.setTimestamp(2,Timestamp.valueOf(a.getAuthorRegistrationTime()));
                 stmtAuthor.setString(3, a.getAuthorPhone());
                 stmtAuthor.setString(4, a.getAuthor());
                 stmtAuthor.addBatch();
@@ -110,17 +111,16 @@ public class Loader2 {
             }
         }
     }
-
     private static void loadPost(Post a) {
         if (con != null) {
             try {
                 stmtPost.setInt(1, a.getPostID());
                 stmtPost.setString(2, a.getTitle());
                 stmtPost.setString(3, a.getContent());
-                stmtPost.setString(4, a.getPostingTime());
+                stmtPost.setTimestamp(4, Timestamp.valueOf(a.getPostingTime()));
                 stmtPost.setString(5, a.getPostingCity());
                 stmtPost.setString(6, a.getAuthor());
-                PostTimeMap.put(a.getPostID(), a.getPostingTime());
+                PostTimeMap.put(a.getPostID(),a.getPostingTime());
                 cnt++;
                 stmtPost.addBatch();
             } catch (SQLException e) {
@@ -210,6 +210,11 @@ public class Loader2 {
         return randomDateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
     }
 
+//    public static String GenerateAuthorId(String timestampString) {
+//    }
+
+
+
     public static String GeneratePhone() {
         int length = 10;
         String digits = "0123456789";
@@ -239,9 +244,9 @@ public class Loader2 {
         return randomString;
     }
 
-    public static void loadReply(Replies r) {
-        if (con != null) {
-            try {
+    public static void loadReply(Replies r){
+        if(con!=null){
+            try{
                 stmtReply.setInt(1, replyId);
                 stmtReply.setInt(2, r.getPostID());
                 stmtReply.setString(3, r.getReplyContent());
@@ -254,7 +259,7 @@ public class Loader2 {
                 stmtReply.addBatch();
                 replyId++;
                 cnt++;
-            } catch (SQLException e) {
+            }catch (SQLException e){
                 throw new RuntimeException(e);
             }
         }
@@ -273,7 +278,7 @@ public class Loader2 {
                 stmtSecondReply.setString(4, r.getSecondaryReplyContent());
                 stmtSecondReply.addBatch();
                 cnt++;
-                stmtReToSecRe.setInt(1, findReply(r.getReplyContent(), r.getReplyStars(), r.getReplyAuthor()));
+                stmtReToSecRe.setInt(1, findReply(r.getReplyContent(),r.getReplyStars(),r.getReplyAuthor()));
                 stmtReToSecRe.setInt(2, secondReplyId);
                 stmtReToSecRe.addBatch();
                 cnt++;
@@ -284,13 +289,13 @@ public class Loader2 {
         }
     }
 
-    public static int findReply(String content, int stars, String author_name) {
+    public static int findReply(String content,int stars,String author_name){
         String sql = "SELECT reply_id FROM replies WHERE content = ? and stars = ? and author_name = ?;";
         try {
             PreparedStatement ps = con.prepareStatement(sql);
-            ps.setString(1, content);
-            ps.setInt(2, stars);
-            ps.setString(3, author_name);
+            ps.setString(1,content );
+            ps.setInt(2,stars);
+            ps.setString(3,author_name);
             ResultSet rs = ps.executeQuery();
             rs.next();
             return rs.getInt("reply_id");
@@ -316,8 +321,8 @@ public class Loader2 {
         }
     }
 
+
     public static void main(String[] args) {
-        Scanner in = new Scanner(System.in);
         Properties prop = loadDBUser();
         long start = 0;
         long end = 0;
@@ -329,155 +334,48 @@ public class Loader2 {
             start = System.currentTimeMillis();
             openDB(prop);
             setPrepareStatement();
-            /*
-             * 用户权限
-             *
-             *
-             *
-             * */
-            boolean isInputName = false;
-            boolean isLogin = false;
-            String authorName = "";
-            String authorId = "";
-            String authorPhone = "";
-            String author_registration_time = "";
-            String password = "";
-            while (true) {
-                String sql = "";
-                String a = in.next(); //命令 ：reg author_name password
-                while (a.equalsIgnoreCase("quit")) {
-                    String[] cmd = a.trim().split(" ");
-                    switch (cmd[0].toLowerCase(Locale.ROOT)) {
-                        case "reg"://reg author_name
-
-                            break;
-                        case "like"://like post_id
-
-                            break;
-                        case "favorite"://favorite post_id
-                            break;
-
-                        case "reply"://reply post_id content
-                            break;
-
-                        case "post"://post content
-                            break;
-
-                        case "share": {
-                            //share post_id
-
-
-                            break;
-
-
-                        }
-
-
-                        case "checklist": {
-                            //checklist follow or like or.....
-                            String type = cmd[1];
-                            switch (type) {
-                                case "follow": {
-                                    sql = "select *\n" +
-                                            "from author_followed\n" +
-                                            "where author_name = ?;";
-                                    PreparedStatement ps = con.prepareStatement(sql);
-                                    ps.setString(1, authorName);
-                                    ResultSet rs = ps.executeQuery();
-                                    if (rs.next()) {
-                                        System.out.println("author_name" + "     " + "author_id");
-                                        System.out.println(rs.getString("author_name") + "     " + rs.getString("author_id"));
-                                        while (rs.next()) {
-                                            System.out.println(rs.getString("author_name") + "     " + rs.getString("author_id"));
-                                        }
-                                    } else {
-                                        System.out.println("you don't follow any other authors");
-                                    }
-                                    break;
-                                }
-                                case "like": {
-                                    sql = "select *\n" +
-                                            "from like_post\n" +
-                                            "where author_name = ?;";
-                                    PreparedStatement ps = con.prepareStatement(sql);
-                                    ps.setString(1, authorName);
-                                    ResultSet rs = ps.executeQuery();
-                                    if (rs.next()) {
-                                        System.out.println("post_id");
-                                        System.out.println(rs.getInt("post_id"));
-                                        while (rs.next()) {
-                                            System.out.println(rs.getInt("post_id"));
-                                        }
-                                    } else {
-                                        System.out.println("you don't like any posts");
-                                    }
-                                    break;
-                                }
-                            }
-
-                            break;
-                        }
-                        case "follow": {
-                            //follow author_name
-                            //判断author是否存在
-                            sql = "SELECT *\n" +
-                                    "from authors\n" +
-                                    "where author_name = ?;";
-                            PreparedStatement ps = con.prepareStatement(sql);
-                            ps.setString(1, cmd[1]);
-                            ResultSet rs = ps.executeQuery();
-                            if (rs.next()) {
-                                stmtFollow.setString(1, authorName);
-                                stmtFollow.setString(2, cmd[1]);
-                                stmtFollow.addBatch();
-                                stmtAuthor.executeBatch();
-                            } else {
-                                System.out.println("this author doesn't exist");
-                            }
-                            break;
-                        }
-                        case "login": {
-                            //login author_name
-                            authorName = cmd[1];
-                            sql = "SELECT *\n" +
-                                    "from authors\n" +
-                                    "where author_name = ?;";
-                            PreparedStatement ps = con.prepareStatement(sql);
-                            ps.setString(1, authorName);
-                            ResultSet rs = ps.executeQuery();
-                            if (rs.next()) {
-                                password = rs.getString("password");
-                                isInputName = true;
-                            } else {
-                                System.out.println("author isn't existing.Please register first");
-                            }
-                            break;
-                        }
-
-                        case "pw": {
-                            //pw password
-                            if (isInputName) {
-                                if (Objects.equals(password, cmd[1])) {
-                                    isLogin = true;
-                                } else {
-                                    System.out.println("password is wrong");
-                                }
-                            }
-                            break;
-                        }
-                        case "search"://search for post / author /
-                    }
-                }
+            for (int i = 0; i < posts.size(); i++) {
+                Post a = posts.get(i);
+                loadPost(a);
+                loadAuthor(a);
             }
-
+            stmtAuthor.executeBatch();
+            stmtPost.executeBatch();
+            for (int i = 0; i < posts.size(); i++) {
+                Post a = posts.get(i);
+                loadPostData(a);
+            }
+            stmtAuthor.executeBatch();
+            stmtFollow.executeBatch();
+            stmtFavr.executeBatch();
+            stmtShare.executeBatch();
+            stmtLike.executeBatch();
+            stmtCate.executeBatch();
+            con.commit();
+            for (int i = 0; i < replies.size(); i++) {
+                Replies r = replies.get(i);
+                loadReply(r);
+            }
+            stmtAuthor.executeBatch();
+            stmtReply.executeBatch();
+            for (int i = 0; i < replies.size(); i++) {
+                Replies r = replies.get(i);
+                loadSecondReplies(r);
+            }
+            stmtAuthor.executeBatch();
+            stmtSecondReply.executeBatch();
+            stmtReToSecRe.executeBatch();
+            end = System.currentTimeMillis();
+            con.commit();
+            con.close();
         } catch (SQLException e) {
             throw new RuntimeException(e);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-//        closeDB();
+        closeDB();
 //        System.out.println(cnt + " records successfully loaded");
-//        System.out.println(end - start);
+        System.out.println(end - start + "ms");
 //        System.out.println("Loading speed : " + (cnt * 1000L) / (end - start) + " records/s");
     }
 
