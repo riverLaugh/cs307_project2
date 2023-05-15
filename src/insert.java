@@ -57,7 +57,7 @@ public class insert {
         try {
             stmtPost = con.prepareStatement("INSERT INTO public.posts (ID,title,content,posting_time,posting_city,author_name) " +
                     "VALUES (?,?,?,?,?,?);");
-            stmtAuthor = con.prepareStatement("INSERT INTO public.authors (author_id,author_registration_time,author_phone,author_name) VALUES (?,?,?,?) ON CONFLICT (author_name) DO NOTHING ;");
+            stmtAuthor = con.prepareStatement("INSERT INTO public.authors (author_id,author_registration_time,author_phone,author_name,password) VALUES (?,?,?,?,'111') ON CONFLICT (author_name) DO NOTHING ;");
             stmtFollow = con.prepareStatement("INSERT INTO public.author_followed (author_name,followed_author_name)" + "VALUES (?,?) ON CONFLICT(author_name,followed_author_name) DO NOTHING;");
             stmtFavr = con.prepareStatement("INSERT INTO public.author_favorited (post_id,favorited_author_name)" + "VALUES (?,?) ON CONFLICT(post_id,favorited_author_name) DO NOTHING;");
             stmtShare = con.prepareStatement("INSERT INTO public.share_author (post_id,shared_author_name)" + "VALUES (?,?) ON CONFLICT (post_id,shared_author_name) DO NOTHING;");
@@ -127,9 +127,7 @@ public class insert {
                 throw new RuntimeException(e);
             }
         }
-
     }
-
     private static void loadPostData(Post a) {
         if (con != null) {
             try {
@@ -143,33 +141,27 @@ public class insert {
                     stmtFollow.addBatch();
                     cnt++;
                 }
-
                 for (int i = 0; i < a.getAuthorFavorite().size(); i++) {
-
                     String regtime = GenerateTime(a.getPostingTime());
                     String id = GenerateAuthorId();
                     String phone = GeneratePhone();
                     insertAuthor(id, regtime, phone, a.getAuthorFavorite().get(i));
-
                     stmtFavr.setInt(1, a.getPostID());
                     stmtFavr.setString(2, a.getAuthorFavorite().get(i));
                     stmtFavr.addBatch();
                     cnt++;
                 }
                 for (int i = 0; i < a.getAuthorShared().size(); i++) {
-
                     String regtime = GenerateTime(a.getPostingTime());
                     String id = GenerateAuthorId();
                     String phone = GeneratePhone();
                     insertAuthor(id, regtime, phone, a.getAuthorShared().get(i));
-
                     stmtShare.setInt(1, a.getPostID());
                     stmtShare.setString(2, a.getAuthorShared().get(i));
                     stmtShare.addBatch();
                     cnt++;
                 }
                 for (int i = 0; i < a.getAuthorLiked().size(); i++) {
-
                     String regtime = GenerateTime(a.getPostingTime());
                     String id = GenerateAuthorId();
                     String phone = GeneratePhone();
@@ -194,7 +186,7 @@ public class insert {
     public static void insertAuthor(String ID, String time, String phone, String name) {
         try {
             stmtAuthor.setString(1, ID);
-            stmtAuthor.setString(2, time);
+            stmtAuthor.setTimestamp(2, Timestamp.valueOf(time));
             stmtAuthor.setString(3, phone);
             stmtAuthor.setString(4, name);
             stmtAuthor.addBatch();

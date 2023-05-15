@@ -194,7 +194,7 @@ public class server {
     public static void insertAuthor(String ID, String time, String phone, String name) {
         try {
             stmtAuthor.setString(1, ID);
-            stmtAuthor.setString(2, time);
+            stmtAuthor.setTimestamp(2, Timestamp.valueOf(time));
             stmtAuthor.setString(3, phone);
             stmtAuthor.setString(4, name);
             stmtAuthor.addBatch();
@@ -367,15 +367,23 @@ public class server {
                             PreparedStatement ps = con.prepareStatement(sql);
                             ps.setString(1, b);
                             ResultSet rs = ps.executeQuery();
-
                             if (rs.next()) {
                                 System.out.print("The name has already been registered");
                             } else {
-                                authorName = b;
-                                authorId = GenerateAuthorId();
-                                author_registration_time = getCurrentTime();
-                                authorPhone = GeneratePhone();
-                                insertAuthor(authorId, author_registration_time, authorPhone, authorName);
+                                System.out.print("Input your password: ");
+                                String password = in.next();
+                                System.out.print("confirm your password: ");
+                                if(Objects.equals(password, in.next())){
+                                    System.out.print("Input your phone number: ");
+                                    authorPhone = in.next();
+                                    authorName = b;
+                                    authorId = GenerateAuthorId();
+                                    author_registration_time = getCurrentTime();
+                                    insertAuthor(authorId, author_registration_time, authorPhone, authorName);
+                                    stmtAuthor.executeBatch();
+                                    System.out.println("register is finished.Please login in.");
+                                }
+
                             }
                             break;
                         }
@@ -457,7 +465,6 @@ public class server {
                             ResultSet rs = ps.executeQuery();
                             if (rs.next()) {
                                 stmtReply.setInt(1, b);
-
                                 System.out.print("content: ");
                                 content = in.next();
                                 stmtReply.setString(2, content);
@@ -615,7 +622,7 @@ public class server {
 
                         case "login": {
                             //login author_name
-                            System.out.println("author:");
+                            System.out.print("author:");
                             authorName = in.next();
                             sql = "SELECT *\n" +
                                     "from authors\n" +
@@ -625,10 +632,13 @@ public class server {
                             ResultSet rs = ps.executeQuery();
                             if (rs.next()) {
                                 String password = rs.getString("password");
-                                System.out.println("Password:");
+                                System.out.print("Password:");
                                 if (Objects.equals(in.next(), password)) {
                                     isLogin = true;
                                     System.out.println("login in successfully");
+                                }else{
+                                    System.out.println("your password is wrong");
+                                    System.out.println(password);
                                 }
                             } else {
                                 System.out.println("author isn't existing.Please register first");
