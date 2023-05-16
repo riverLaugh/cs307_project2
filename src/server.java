@@ -205,6 +205,7 @@ public class server {
                                 stmtLike.setInt(1, b);
                                 stmtLike.setString(2, authorName);
                                 stmtLike.addBatch();
+                                System.out.println("you like this post");
                             } else {
                                 System.out.print("This post doesn't exist");
                             }
@@ -225,8 +226,9 @@ public class server {
                                 stmtFavr.setInt(1, b);
                                 stmtFavr.setString(2, authorName);
                                 stmtFavr.addBatch();
+                                System.out.println("you favorite this post.");
                             } else {
-                                System.out.print("This post doesn't exist");
+                                System.out.print("This post doesn't exist.");
                             }
                             break;
                         }
@@ -245,6 +247,7 @@ public class server {
                                 stmtShare.setInt(1, b);
                                 stmtShare.setString(2, authorName);
                                 stmtShare.addBatch();
+                                System.out.println("you have share this post");
                             } else {
                                 System.out.print("This post doesn't exist");
                             }
@@ -268,6 +271,7 @@ public class server {
                                 stmtReply.setInt(3, 0);
                                 stmtReply.setString(4, authorName);
                                 stmtReply.addBatch();
+                                System.out.println("reply successfully");
                             } else {
                                 System.out.print("This post doesn't exist");
                             }
@@ -300,6 +304,7 @@ public class server {
                                 stmtReToSecRe.setInt(1, b);
                                 stmtReToSecRe.setInt(2, rs1.getInt("id"));
                                 stmtReToSecRe.addBatch();
+                                System.out.println("reply successfully");
                             } else {
                                 System.out.print("This reply doesn't exist");
                             }
@@ -317,6 +322,7 @@ public class server {
                                 stmtPost.setString(4, "Shenzhen");
                                 stmtPost.setString(5, authorName);
                                 stmtPost.addBatch();
+                                System.out.println("post successfully");
                             } else {
                                 System.out.print("You have not logged in yet");
                             }
@@ -325,7 +331,7 @@ public class server {
 
                         case "checklist": {
                             //checklist follow or like or.....
-                            System.out.print("Please input what list you want to search:");
+                            System.out.print("Please input what list you want to search(share/like/favorite):");
                             String type = in.next();
                             switch (type.toLowerCase(Locale.ROOT)) {
                                 case "follow": {
@@ -404,8 +410,9 @@ public class server {
                                 stmtFollow.setString(1, authorName);
                                 stmtFollow.setString(2, cmd[1]);
                                 stmtFollow.addBatch();
+                                System.out.println("follow successfully.");
                             } else {
-                                System.out.println("this author doesn't exist");
+                                System.out.println("this author doesn't exist.");
                             }
                             break;
                         }
@@ -425,7 +432,6 @@ public class server {
                                 System.out.print("Password:");
                                 if (Objects.equals(in.next(), password)) {
                                     isLogin = true;
-
                                     System.out.println("login in successfully");
                                 }else{
                                     System.out.println("your password is wrong");
@@ -461,7 +467,7 @@ public class server {
                     authorId = "";
                     authorPhone = "";
                     author_registration_time = "";
-
+                    System.out.println("you log out successfully");
                 }
 
             }
