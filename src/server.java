@@ -106,37 +106,18 @@ public class server {
             stmtAuthor.setString(4, name);
             stmtAuthor.setString(5,password);
             stmtAuthor.addBatch();
+            stmtAuthor.executeBatch();
+            con.commit();
             cnt++;
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }
     }
 
-    public static String GenerateTime(String time) {
-        LocalDateTime dateTime = LocalDateTime.parse(time, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-        LocalDateTime randomDateTime = dateTime.minusSeconds(ThreadLocalRandom.current().nextLong(0, dateTime.toEpochSecond(ZoneOffset.UTC)));
-        return randomDateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-    }
-
     public static String getCurrentTime() {
         LocalDateTime now = LocalDateTime.now();
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
         return now.format(formatter);
-    }
-
-    public static String GeneratePhone() {
-        int length = 10;
-        String digits = "0123456789";
-        Random rand = new Random();
-        StringBuilder sb = new StringBuilder(length + 1);
-        sb.append(1);
-        for (int i = 0; i < length; i++) {
-            int index = rand.nextInt(digits.length());
-            char randomChar = digits.charAt(index);
-            sb.append(randomChar);
-        }
-        String randomString = sb.toString();
-        return randomString;
     }
 
     public static String GenerateAuthorId() {
@@ -154,38 +135,6 @@ public class server {
     }
 
 
-    public static int findReply(String content, int stars, String author_name) {
-        String sql = "SELECT reply_id FROM replies WHERE content = ? and stars = ? and author_name = ?;";
-        try {
-            PreparedStatement ps = con.prepareStatement(sql);
-            ps.setString(1, content);
-            ps.setInt(2, stars);
-            ps.setString(3, author_name);
-            ResultSet rs = ps.executeQuery();
-            rs.next();
-            return rs.getInt("reply_id");
-        } catch (SQLException e) {
-            System.out.println("查询失败");
-            // 记得要关闭 ResultSet 和 PreparedStatement 对象
-            throw new RuntimeException(e);
-        }
-    }
-
-    public static String findPostTime(int postId) {
-        String sql = "SELECT posting_time FROM posts WHERE ID = ?;";
-        try {
-            PreparedStatement ps = con.prepareStatement(sql);
-            ps.setInt(1, postId);
-            ResultSet rs = ps.executeQuery();
-            rs.next();
-            return rs.getString("posting_time");
-        } catch (SQLException e) {
-            System.out.println("查询失败");
-            // 记得要关闭 ResultSet 和 PreparedStatement 对象
-            throw new RuntimeException(e);
-        }
-    }
-
     public static void main(String[] args) {
         Scanner in = new Scanner(System.in);
         Properties prop = loadDBUser();
@@ -199,19 +148,11 @@ public class server {
             start = System.currentTimeMillis();
             openDB(prop);
             setPrepareStatement();
-            /*
-             * 用户权限
-             *
-             *
-             *
-             * */
-            boolean isInputName = false;
             boolean isLogin = false;
             String authorName = "";
             String authorId = "";
             String authorPhone = "";
             String author_registration_time = "";
-
             String content = "";
             int stars;
             String title = "";
@@ -221,7 +162,7 @@ public class server {
                 if (!a.equalsIgnoreCase("quit")) {
                     String[] cmd = a.trim().split(" ");
                     switch (cmd[0].toLowerCase(Locale.ROOT)) {
-                        case "reg": { //reg author_name
+                        case "register": { //reg author_name
                             //判断author是否已被注册
                             System.out.print("Please input your name: ");
                             String b = in.next();
@@ -244,10 +185,8 @@ public class server {
                                     authorId = GenerateAuthorId();
                                     author_registration_time = getCurrentTime();
                                     insertAuthor(authorId, author_registration_time, authorPhone, authorName,password);
-                                    stmtAuthor.executeBatch();
                                     System.out.println("register is finished.Please login in.");
                                 }
-
                             }
                             break;
                         }
@@ -268,6 +207,7 @@ public class server {
                                 stmtLike.addBatch();
                                 stmtAuthor.executeBatch();
                                 stmtPost.executeBatch();
+                                con.commit();
                             } else {
                                 System.out.print("This post doesn't exist");
                             }
@@ -290,6 +230,7 @@ public class server {
                                 stmtFavr.addBatch();
                                 stmtAuthor.executeBatch();
                                 stmtPost.executeBatch();
+                                con.commit();
                             } else {
                                 System.out.print("This post doesn't exist");
                             }
@@ -312,6 +253,7 @@ public class server {
                                 stmtShare.addBatch();
                                 stmtAuthor.executeBatch();
                                 stmtPost.executeBatch();
+                                con.commit();
                             } else {
                                 System.out.print("This post doesn't exist");
                             }
@@ -334,10 +276,9 @@ public class server {
                                 stmtReply.setString(2, content);
                                 stmtReply.setInt(3, 0);
                                 stmtReply.setString(4, authorName);
-
                                 stmtReply.addBatch();
                                 stmtAuthor.executeBatch();
-
+                                con.commit();
                             } else {
                                 System.out.print("This post doesn't exist");
                             }
@@ -359,10 +300,8 @@ public class server {
                                 System.out.print("content: ");
                                 content = in.next();
                                 stmtSecondReply.setString(3, content);
-
                                 stmtSecondReply.addBatch();
                                 stmtAuthor.executeBatch();
-
                                 String sql1 = "SELECT *\n" +
                                         "from second_replies\n" +
                                         "where content = ?;";
@@ -372,6 +311,9 @@ public class server {
                                 rs1.next();
                                 stmtReToSecRe.setInt(1, b);
                                 stmtReToSecRe.setInt(2, rs1.getInt("id"));
+                                stmtSecondReply.executeBatch();
+                                stmtReToSecRe.executeBatch();
+                                con.commit();
                             } else {
                                 System.out.print("This reply doesn't exist");
                             }
@@ -382,11 +324,9 @@ public class server {
                                 System.out.print("Your post's title is: ");
                                 title = in.next();
                                 stmtPost.setString(1, title);
-
                                 System.out.print("content: ");
                                 content = in.next();
                                 stmtPost.setString(2, content);
-
                                 stmtPost.setString(3, getCurrentTime());
                                 stmtPost.setString(4, "Shenzhen");
                                 stmtPost.setString(5, authorName);
@@ -499,6 +439,7 @@ public class server {
                                 System.out.print("Password:");
                                 if (Objects.equals(in.next(), password)) {
                                     isLogin = true;
+
                                     System.out.println("login in successfully");
                                 }else{
                                     System.out.println("your password is wrong");
@@ -518,7 +459,6 @@ public class server {
                         }
                     }
                 } else {
-                    isInputName = false;
                     isLogin = false;
                     authorName = "";
                     authorId = "";
