@@ -205,10 +205,6 @@ public class server {
                                 stmtLike.setInt(1, b);
                                 stmtLike.setString(2, authorName);
                                 stmtLike.addBatch();
-                                stmtLike.executeBatch();
-                                stmtAuthor.executeBatch();
-                                stmtPost.executeBatch();
-                                con.commit();
                             } else {
                                 System.out.print("This post doesn't exist");
                             }
@@ -229,9 +225,6 @@ public class server {
                                 stmtFavr.setInt(1, b);
                                 stmtFavr.setString(2, authorName);
                                 stmtFavr.addBatch();
-                                stmtAuthor.executeBatch();
-                                stmtPost.executeBatch();
-                                con.commit();
                             } else {
                                 System.out.print("This post doesn't exist");
                             }
@@ -252,9 +245,6 @@ public class server {
                                 stmtShare.setInt(1, b);
                                 stmtShare.setString(2, authorName);
                                 stmtShare.addBatch();
-                                stmtAuthor.executeBatch();
-                                stmtPost.executeBatch();
-                                con.commit();
                             } else {
                                 System.out.print("This post doesn't exist");
                             }
@@ -278,8 +268,6 @@ public class server {
                                 stmtReply.setInt(3, 0);
                                 stmtReply.setString(4, authorName);
                                 stmtReply.addBatch();
-                                stmtAuthor.executeBatch();
-                                con.commit();
                             } else {
                                 System.out.print("This post doesn't exist");
                             }
@@ -302,7 +290,6 @@ public class server {
                                 content = in.next();
                                 stmtSecondReply.setString(3, content);
                                 stmtSecondReply.addBatch();
-                                stmtAuthor.executeBatch();
                                 String sql1 = "SELECT *\n" +
                                         "from second_replies\n" +
                                         "where content = ?;";
@@ -312,9 +299,7 @@ public class server {
                                 rs1.next();
                                 stmtReToSecRe.setInt(1, b);
                                 stmtReToSecRe.setInt(2, rs1.getInt("id"));
-                                stmtSecondReply.executeBatch();
-                                stmtReToSecRe.executeBatch();
-                                con.commit();
+                                stmtReToSecRe.addBatch();
                             } else {
                                 System.out.print("This reply doesn't exist");
                             }
@@ -331,8 +316,7 @@ public class server {
                                 stmtPost.setString(3, getCurrentTime());
                                 stmtPost.setString(4, "Shenzhen");
                                 stmtPost.setString(5, authorName);
-                                stmtPost.executeBatch();
-                                con.commit();
+                                stmtPost.addBatch();
                             } else {
                                 System.out.print("You have not logged in yet");
                             }
@@ -420,9 +404,6 @@ public class server {
                                 stmtFollow.setString(1, authorName);
                                 stmtFollow.setString(2, cmd[1]);
                                 stmtFollow.addBatch();
-                                stmtFollow.executeBatch();
-                                stmtAuthor.executeBatch();
-                                con.commit();
                             } else {
                                 System.out.println("this author doesn't exist");
                             }
@@ -463,6 +444,17 @@ public class server {
 
                         }
                     }
+                    stmtLike.executeBatch();
+                    stmtAuthor.executeBatch();
+                    stmtPost.executeBatch();
+                    stmtSecondReply.executeBatch();
+                    stmtReToSecRe.executeBatch();
+                    stmtFollow.executeBatch();
+                    stmtFavr.executeBatch();
+                    stmtReply.executeBatch();
+                    stmtShare.executeBatch();
+                    stmtCate.executeBatch();
+                    con.commit();
                 } else {
                     isLogin = false;
                     authorName = "";
