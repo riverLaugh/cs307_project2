@@ -205,6 +205,7 @@ public class server {
                                 stmtLike.setInt(1, b);
                                 stmtLike.setString(2, authorName);
                                 stmtLike.addBatch();
+                                stmtLike.executeBatch();
                                 stmtAuthor.executeBatch();
                                 stmtPost.executeBatch();
                                 con.commit();
@@ -330,6 +331,8 @@ public class server {
                                 stmtPost.setString(3, getCurrentTime());
                                 stmtPost.setString(4, "Shenzhen");
                                 stmtPost.setString(5, authorName);
+                                stmtPost.executeBatch();
+                                con.commit();
                             } else {
                                 System.out.print("You have not logged in yet");
                             }
@@ -417,7 +420,9 @@ public class server {
                                 stmtFollow.setString(1, authorName);
                                 stmtFollow.setString(2, cmd[1]);
                                 stmtFollow.addBatch();
+                                stmtFollow.executeBatch();
                                 stmtAuthor.executeBatch();
+                                con.commit();
                             } else {
                                 System.out.println("this author doesn't exist");
                             }
