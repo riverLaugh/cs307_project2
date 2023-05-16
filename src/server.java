@@ -55,7 +55,7 @@ public class server {
         try {
             stmtPost = con.prepareStatement("INSERT INTO public.posts (title,content,posting_time,posting_city,author_name) " +
                     "VALUES (?,?,?,?,?);");
-            stmtAuthor = con.prepareStatement("INSERT INTO public.authors (author_id,author_registration_time,author_phone,author_name) VALUES (?,?,?,?) ON CONFLICT (author_name) DO NOTHING ;");
+            stmtAuthor = con.prepareStatement("INSERT INTO public.authors (author_id,author_registration_time,author_phone,author_name,password) VALUES (?,?,?,?,?) ON CONFLICT (author_name) DO NOTHING ;");
             stmtFollow = con.prepareStatement("INSERT INTO public.author_followed (author_name,followed_author_name)" + "VALUES (?,?) ON CONFLICT(author_name,followed_author_name) DO NOTHING;");
             stmtFavr = con.prepareStatement("INSERT INTO public.author_favorited (post_id,favorited_author_name)" + "VALUES (?,?) ON CONFLICT(post_id,favorited_author_name) DO NOTHING;");
             stmtShare = con.prepareStatement("INSERT INTO public.share_author (post_id,shared_author_name)" + "VALUES (?,?) ON CONFLICT (post_id,shared_author_name) DO NOTHING;");
@@ -96,107 +96,15 @@ public class server {
         }
     }
 
-    private static void loadAuthor(Post a) {
-        if (con != null) {
-            try {
-                stmtAuthor.setString(1, a.getAuthorID());
-                stmtAuthor.setString(2, a.getAuthorRegistrationTime());
-                stmtAuthor.setString(3, a.getAuthorPhone());
-                stmtAuthor.setString(4, a.getAuthor());
-                stmtAuthor.addBatch();
-                cnt++;
-            } catch (SQLException e) {
-                throw new RuntimeException(e);
-            }
-        }
-    }
 
-    private static void loadPost(Post a) {
-        if (con != null) {
-            try {
-                stmtPost.setInt(1, a.getPostID());
-                stmtPost.setString(2, a.getTitle());
-                stmtPost.setString(3, a.getContent());
-                stmtPost.setString(4, a.getPostingTime());
-                stmtPost.setString(5, a.getPostingCity());
-                stmtPost.setString(6, a.getAuthor());
-                PostTimeMap.put(a.getPostID(), a.getPostingTime());
-                cnt++;
-                stmtPost.addBatch();
-            } catch (SQLException e) {
-                throw new RuntimeException(e);
-            }
-        }
 
-    }
-
-    private static void loadPostData(Post a) {
-        if (con != null) {
-            try {
-                for (int i = 0; i < a.getAuthorFollowedBy().size(); i++) {
-                    String regtime = GenerateTime(a.getPostingTime());
-                    String id = GenerateAuthorId();
-                    String phone = GeneratePhone();
-                    insertAuthor(id, regtime, phone, a.getAuthorFollowedBy().get(i));
-                    stmtFollow.setString(1, a.getAuthor());
-                    stmtFollow.setString(2, a.getAuthorFollowedBy().get(i));
-                    stmtFollow.addBatch();
-                    cnt++;
-                }
-
-                for (int i = 0; i < a.getAuthorFavorite().size(); i++) {
-
-                    String regtime = GenerateTime(a.getPostingTime());
-                    String id = GenerateAuthorId();
-                    String phone = GeneratePhone();
-                    insertAuthor(id, regtime, phone, a.getAuthorFavorite().get(i));
-
-                    stmtFavr.setInt(1, a.getPostID());
-                    stmtFavr.setString(2, a.getAuthorFavorite().get(i));
-                    stmtFavr.addBatch();
-                    cnt++;
-                }
-                for (int i = 0; i < a.getAuthorShared().size(); i++) {
-
-                    String regtime = GenerateTime(a.getPostingTime());
-                    String id = GenerateAuthorId();
-                    String phone = GeneratePhone();
-                    insertAuthor(id, regtime, phone, a.getAuthorShared().get(i));
-
-                    stmtShare.setInt(1, a.getPostID());
-                    stmtShare.setString(2, a.getAuthorShared().get(i));
-                    stmtShare.addBatch();
-                    cnt++;
-                }
-                for (int i = 0; i < a.getAuthorLiked().size(); i++) {
-
-                    String regtime = GenerateTime(a.getPostingTime());
-                    String id = GenerateAuthorId();
-                    String phone = GeneratePhone();
-                    insertAuthor(id, regtime, phone, a.getAuthorLiked().get(i));
-                    stmtLike.setInt(1, a.getPostID());
-                    stmtLike.setString(2, a.getAuthorLiked().get(i));
-                    stmtLike.addBatch();
-                    cnt++;
-                }
-                for (int i = 0; i < a.getCategory().size(); i++) {
-                    stmtCate.setInt(1, a.getPostID());
-                    stmtCate.setString(2, a.getCategory().get(i));
-                    stmtCate.addBatch();
-                    cnt++;
-                }
-            } catch (SQLException ex) {
-                throw new RuntimeException(ex);
-            }
-        }
-    }
-
-    public static void insertAuthor(String ID, String time, String phone, String name) {
+    public static void insertAuthor(String ID, String time, String phone, String name,String password) {
         try {
             stmtAuthor.setString(1, ID);
             stmtAuthor.setTimestamp(2, Timestamp.valueOf(time));
             stmtAuthor.setString(3, phone);
             stmtAuthor.setString(4, name);
+            stmtAuthor.setString(5,password);
             stmtAuthor.addBatch();
             cnt++;
         } catch (SQLException e) {
@@ -245,50 +153,6 @@ public class server {
         return randomString;
     }
 
-    public static void loadReply(Replies r) {
-        if (con != null) {
-            try {
-                stmtReply.setInt(1, replyId);
-                stmtReply.setInt(2, r.getPostID());
-                stmtReply.setString(3, r.getReplyContent());
-                stmtReply.setInt(4, r.getReplyStars());
-                String regtime1 = GenerateTime(PostTimeMap.get(r.getPostID()));
-                String id1 = GenerateAuthorId();
-                String phone1 = GeneratePhone();
-                insertAuthor(id1, regtime1, phone1, r.getReplyAuthor());
-                stmtReply.setString(5, r.getReplyAuthor());
-                stmtReply.addBatch();
-                replyId++;
-                cnt++;
-            } catch (SQLException e) {
-                throw new RuntimeException(e);
-            }
-        }
-    }
-
-    public static void loadSecondReplies(Replies r) {
-        if (con != null) {
-            try {
-                stmtSecondReply.setInt(1, secondReplyId);
-                stmtSecondReply.setInt(2, r.getSecondaryReplyStars());
-                String regtime = GenerateTime(PostTimeMap.get(r.getPostID()));
-                String id = GenerateAuthorId();
-                String phone = GeneratePhone();
-                insertAuthor(id, regtime, phone, r.getSecondaryReplyAuthor());
-                stmtSecondReply.setString(3, r.getSecondaryReplyAuthor());
-                stmtSecondReply.setString(4, r.getSecondaryReplyContent());
-                stmtSecondReply.addBatch();
-                cnt++;
-                stmtReToSecRe.setInt(1, findReply(r.getReplyContent(), r.getReplyStars(), r.getReplyAuthor()));
-                stmtReToSecRe.setInt(2, secondReplyId);
-                stmtReToSecRe.addBatch();
-                cnt++;
-                secondReplyId++;
-            } catch (SQLException e) {
-                throw new RuntimeException(e);
-            }
-        }
-    }
 
     public static int findReply(String content, int stars, String author_name) {
         String sql = "SELECT reply_id FROM replies WHERE content = ? and stars = ? and author_name = ?;";
@@ -379,7 +243,7 @@ public class server {
                                     authorName = b;
                                     authorId = GenerateAuthorId();
                                     author_registration_time = getCurrentTime();
-                                    insertAuthor(authorId, author_registration_time, authorPhone, authorName);
+                                    insertAuthor(authorId, author_registration_time, authorPhone, authorName,password);
                                     stmtAuthor.executeBatch();
                                     System.out.println("register is finished.Please login in.");
                                 }
