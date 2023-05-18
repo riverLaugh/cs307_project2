@@ -247,7 +247,6 @@ public class server {
                                     stmtAuthor.executeBatch();
                                     System.out.println("register is finished.Please login in.");
                                 }
-
                             }
                             break;
                         }
