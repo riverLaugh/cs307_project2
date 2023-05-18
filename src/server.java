@@ -192,7 +192,7 @@ public class server {
 
                         case "like": {//like post_id
                             //判断此post_id是否存在
-                            if (isLogin){
+                            if (isLogin) {
                                 System.out.print("The post you like is: ");
                                 int b = in.nextInt();
                                 sql = "SELECT *\n" +
@@ -209,7 +209,7 @@ public class server {
                                 } else {
                                     System.out.print("This post doesn't exist");
                                 }
-                            }else {
+                            } else {
                                 System.out.print("You have not logged in yet");
                             }
                             break;
@@ -217,7 +217,7 @@ public class server {
 
                         case "favorite": {//favorite post_id
                             //判断此post_id是否存在
-                            if (isLogin){
+                            if (isLogin) {
                                 System.out.print("The post you favorite is: ");
                                 int b = in.nextInt();
                                 sql = "SELECT *\n" +
@@ -234,7 +234,7 @@ public class server {
                                 } else {
                                     System.out.print("This post doesn't exist.");
                                 }
-                            }else {
+                            } else {
                                 System.out.print("You have not logged in yet");
                             }
                             break;
@@ -242,7 +242,7 @@ public class server {
 
                         case "share": {//share post_id
                             //判断此post_id是否存在
-                            if (isLogin){
+                            if (isLogin) {
                                 System.out.print("The post you share is: ");
                                 int b = in.nextInt();
                                 sql = "SELECT *\n" +
@@ -259,14 +259,14 @@ public class server {
                                 } else {
                                     System.out.print("This post doesn't exist");
                                 }
-                            }else {
+                            } else {
                                 System.out.print("You have not logged in yet");
                             }
                             break;
                         }
 
                         case "reply": {//reply post_id content
-                            if (isLogin){
+                            if (isLogin) {
                                 System.out.print("The post you reply is: ");
                                 int b = in.nextInt();
                                 sql = "SELECT *\n" +
@@ -295,7 +295,7 @@ public class server {
                                 } else {
                                     System.out.print("This post doesn't exist");
                                 }
-                            }else {
+                            } else {
                                 System.out.print("You have not logged in yet");
                             }
                             break;
@@ -323,7 +323,6 @@ public class server {
                                         stmtSecondReply.setString(3, authorName);
                                         stmtSecondReply.setString(4, content);
                                         stmtSecondReply.addBatch();
-
                                         stmtReToSecRe.setInt(1, b);
                                         stmtReToSecRe.setInt(2, rs1.getInt("id") + 1);
                                         stmtReToSecRe.addBatch();
@@ -364,68 +363,70 @@ public class server {
                             break;
                         }
 
-                        case "checklist": {
+                        case "list": {
                             //checklist follow or like or.....
-                            System.out.print("Please input what list you want to search(share/like/favorite):");
-                            String type = in.next();
-                            switch (type.toLowerCase(Locale.ROOT)) {
-                                case "follow": {
-                                    sql = "select *\n" +
-                                            "from author_followed\n" +
-                                            "where author_name = ?;";
-                                    PreparedStatement ps = con.prepareStatement(sql);
-                                    ps.setString(1, authorName);
-                                    ResultSet rs = ps.executeQuery();
-                                    if (rs.next()) {
-                                        System.out.println("author_name" + "     " + "author_id");
-                                        System.out.println(rs.getString("author_name") + "     " + rs.getString("author_id"));
-                                        while (rs.next()) {
-                                            System.out.println(rs.getString("author_name") + "     " + rs.getString("author_id"));
+                            if (isLogin) {
+                                System.out.print("Please input what list you want to search(follow/like/favorite):");
+                                String type = in.next();
+                                switch (type.toLowerCase(Locale.ROOT)) {
+                                    case "follow": {
+                                        sql = "select *\n" +
+                                                "from author_followed\n" +
+                                                "where author_name = ?;";
+                                        PreparedStatement ps = con.prepareStatement(sql);
+                                        ps.setString(1, authorName);
+                                        ResultSet rs = ps.executeQuery();
+                                        if (rs.next()) {
+                                            System.out.println("author_name");
+                                            System.out.println(rs.getString("followed_author_name"));
+                                            while (rs.next()) {
+                                                System.out.println(rs.getString("followed_author_name"));
+                                            }
+                                        } else {
+                                            System.out.println("you don't follow any other authors");
                                         }
-                                    } else {
-                                        System.out.println("you don't follow any other authors");
+                                        break;
                                     }
-                                    break;
-                                }
 
-                                case "like": {
-                                    sql = "select *\n" +
-                                            "from like_post\n" +
-                                            "where author_name = ?;";
-                                    PreparedStatement ps = con.prepareStatement(sql);
-                                    ps.setString(1, authorName);
-                                    ResultSet rs = ps.executeQuery();
-                                    if (rs.next()) {
-                                        System.out.println("post_id");
-                                        System.out.println(rs.getInt("post_id"));
-                                        while (rs.next()) {
+                                    case "like": {
+                                        sql = "select *\n" +
+                                                "from like_post\n" +
+                                                "where author_name = ?;";
+                                        PreparedStatement ps = con.prepareStatement(sql);
+                                        ps.setString(1, authorName);
+                                        ResultSet rs = ps.executeQuery();
+                                        if (rs.next()) {
+                                            System.out.println("post_id");
                                             System.out.println(rs.getInt("post_id"));
+                                            while (rs.next()) {
+                                                System.out.println(rs.getInt("post_id"));
+                                            }
+                                        } else {
+                                            System.out.println("you don't like any posts");
                                         }
-                                    } else {
-                                        System.out.println("you don't like any posts");
+                                        break;
                                     }
-                                    break;
-                                }
 
-                                case "favourite": {
-                                    sql = "select *\n" +
-                                            "from author_favorited\n" +
-                                            "where favorited_author_name = ?;";
-                                    PreparedStatement ps = con.prepareStatement(sql);
-                                    ps.setString(1, authorName);
-                                    ResultSet rs = ps.executeQuery();
-                                    if (rs.next()) {
-                                        System.out.println("post_id");
-                                        System.out.println(rs.getInt("post_id"));
-                                        while (rs.next()) {
+                                    case "favorite": {
+                                        sql = "select *\n" +
+                                                "from author_favorited\n" +
+                                                "where favorited_author_name = ?;";
+                                        PreparedStatement ps = con.prepareStatement(sql);
+                                        ps.setString(1, authorName);
+                                        ResultSet rs = ps.executeQuery();
+                                        if (rs.next()) {
+                                            System.out.println("post_id");
                                             System.out.println(rs.getInt("post_id"));
+                                            while (rs.next()) {
+                                                System.out.println(rs.getInt("post_id"));
+                                            }
+                                        } else {
+                                            System.out.println("you don't like any posts");
                                         }
-                                    } else {
-                                        System.out.println("you don't like any posts");
+                                        break;
                                     }
-                                    break;
-                                }
 
+                                }
                             }
                             break;
                         }
@@ -433,21 +434,27 @@ public class server {
                         case "follow": {
                             //follow author_name
                             //判断author是否存在
-                            System.out.print("Please input the author:");
-                            String followed_author = in.next();
-                            sql = "SELECT *\n" +
-                                    "from authors\n" +
-                                    "where author_name = ?;";
-                            PreparedStatement ps = con.prepareStatement(sql);
-                            ps.setString(1, followed_author);
-                            ResultSet rs = ps.executeQuery();
-                            if (rs.next()) {
-                                stmtFollow.setString(1, authorName);
-                                stmtFollow.setString(2, cmd[1]);
-                                stmtFollow.addBatch();
-                                System.out.println("follow successfully.");
-                            } else {
-                                System.out.println("this author doesn't exist.");
+                            if (isLogin) {
+                                System.out.print("Please input the author:");
+                                String followed_author = in.next();
+                                if(Objects.equals(followed_author, "quit")){
+                                    System.out.println("you have quited during this command process");
+                                    continue;
+                                }
+                                sql = "SELECT *\n" +
+                                        "from authors\n" +
+                                        "where author_name = ?;";
+                                PreparedStatement ps = con.prepareStatement(sql);
+                                ps.setString(1, followed_author);
+                                ResultSet rs = ps.executeQuery();
+                                if (rs.next()) {
+                                    stmtFollow.setString(1, authorName);
+                                    stmtFollow.setString(2, cmd[1]);
+                                    stmtFollow.addBatch();
+                                    System.out.println("follow successfully.");
+                                } else {
+                                    System.out.println("this author doesn't exist.");
+                                }
                             }
                             break;
                         }
@@ -483,6 +490,19 @@ public class server {
                             System.out.println("if you don't want to find this ");
 
 
+                        }
+                        case "help": {
+                            System.out.println("command: ");
+                            System.out.println("--register: register an author");
+                            System.out.println("--login: login ");
+                            System.out.println("--post: post something you want to post");
+                            System.out.println("--like: like a post");
+                            System.out.println("--favorite: favorite a post");
+                            System.out.println("--share: share a post");
+                            System.out.println("--reply: reply a post");
+                            System.out.println("--second reply: reply a reply");
+                            System.out.println("--list: check some lists about yourself");
+                            System.out.println("--follow: follow an author");
                         }
                     }
                     stmtLike.executeBatch();
