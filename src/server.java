@@ -369,6 +369,74 @@ public class server {
                                 System.out.print("Please input what list you want to search(follow/like/favorite):");
                                 String type = in.next();
                                 switch (type.toLowerCase(Locale.ROOT)) {
+
+                                    case "post": {
+                                        sql = "SELECT * FROM posts where author_name = ?;";
+                                        PreparedStatement ps = con.prepareStatement(sql);
+                                        ps.setString(1, authorName);
+                                        ResultSet rs = ps.executeQuery();
+                                        int count = 0;
+                                        while (rs.next()) {
+                                            count++;
+                                            System.out.print("PostID:" + rs.getString("ID"));
+                                            System.out.println();
+                                            System.out.print("title:" + rs.getString("title"));
+                                            System.out.println();
+                                            System.out.print("content:" + rs.getString("title"));
+                                            System.out.println();
+                                            System.out.print("categories:");
+                                            //category
+                                            String sql1 = "SELECT * from category_post where post_id = ?";
+                                            PreparedStatement ps1 = con.prepareStatement(sql1);
+                                            ps1.setString(1,rs.getString("ID"));
+                                            ResultSet rs1 = ps.executeQuery();
+                                            while(rs1.next()){
+                                                System.out.print(rs1.getString("category")+" ");
+                                            }
+                                            System.out.println();
+                                            //reply
+                                            System.out.print("number of like:");
+                                            String sql2 = "SELECT count(*) from like_post where post_id = ? ";
+                                            PreparedStatement ps2 = con.prepareStatement(sql2);
+                                            ps2.setString(1,rs.getString("ID"));
+                                            ResultSet rs2 = ps2.executeQuery();
+                                            System.out.print(rs2.getInt(1));
+                                            //favourite
+                                            System.out.println();
+                                            System.out.print("number of favourite:");
+                                            String sql3 = "SELECT count(*) from author_favorited where post_id = ? ";
+                                            PreparedStatement ps3 = con.prepareStatement(sql3);
+                                            ps3.setString(1,rs.getString("ID"));
+                                            ResultSet rs3 = ps3.executeQuery();
+                                            System.out.print(rs3.getInt(1));
+                                            System.out.println();
+                                            System.out.print("---------------------------------------------------------");
+                                        }
+                                        if (count == 0) {
+                                            System.out.println("none");
+                                        }
+                                    }
+
+                                    case "reply": {
+                                        sql = "SELECT * from replies where author_name= ?;";
+                                        PreparedStatement ps = con.prepareStatement(sql);
+                                        ps.setString(1, authorName);
+                                        ResultSet rs = ps.executeQuery();
+                                        while (rs.next()) {
+                                            System.out.print("replyID:");
+                                            System.out.println();
+                                            System.out.print("content:");
+                                            System.out.println();
+                                            System.out.print("number of stars:");
+                                            System.out.println();
+                                            System.out.print("time:");
+                                            System.out.println();
+                                            System.out.print("---------------------------------------------------------");
+                                        }
+
+
+                                    }
+
                                     case "follow": {
                                         sql = "select *\n" +
                                                 "from author_followed\n" +
@@ -437,7 +505,7 @@ public class server {
                             if (isLogin) {
                                 System.out.print("Please input the author:");
                                 String followed_author = in.next();
-                                if(Objects.equals(followed_author, "quit")){
+                                if (Objects.equals(followed_author, "quit")) {
                                     System.out.println("you have quited during this command process");
                                     continue;
                                 }
@@ -485,6 +553,11 @@ public class server {
                             break;
                         }
 
+                        case "undo follow": {
+
+                        }
+
+
                         case "search": {
                             //search for post / author /
                             System.out.println("if you don't want to find this ");
@@ -492,13 +565,13 @@ public class server {
 
                         }
 
-                        case "block":{
-                            System.out.print("which author do you want to block");
+                        case "block": {
+                            System.out.print("which author do you want to block");//还需要把前面的命令改了
                             String bcked = in.next();
                             sql = "INSERT INTO public.blocklist(author_name, blocked_name) VALUES (?,?) ON CONFLICT (author_name,blocked_name) DO NOTHING ;";
                             PreparedStatement ps = con.prepareStatement(sql);
-                            ps.setString(1,authorName);
-                            ps.setString(2,bcked);
+                            ps.setString(1, authorName);
+                            ps.setString(2, bcked);
                             ps.executeQuery();
 
                         }
