@@ -491,6 +491,17 @@ public class server {
 
 
                         }
+
+                        case "block":{
+                            System.out.print("which author do you want to block");
+                            String bcked = in.next();
+                            sql = "INSERT INTO public.blocklist(author_name, blocked_name) VALUES (?,?) ON CONFLICT (author_name,blocked_name) DO NOTHING ;";
+                            PreparedStatement ps = con.prepareStatement(sql);
+                            ps.setString(1,authorName);
+                            ps.setString(2,bcked);
+                            ps.executeQuery();
+
+                        }
                         case "help": {
                             System.out.println("command: ");
                             System.out.println("--register: register an author");
