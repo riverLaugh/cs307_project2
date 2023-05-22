@@ -369,7 +369,7 @@ public class server {
                         case "list": {
                             //checklist follow or like or.....
                             if (isLogin) {
-                                System.out.print("Please input what list you want to search(follow/like/favorite/post/reply):");
+                                System.out.print("Please input what list you want to search(follow/like/favorite/post/repied post):");
                                 String type = in.nextLine();
                                 switch (type.toLowerCase(Locale.ROOT)) {
                                     case "post": {
