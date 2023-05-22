@@ -377,60 +377,24 @@ public class server {
                                         PreparedStatement ps = con.prepareStatement(sql);
                                         ps.setString(1, authorName);
                                         ResultSet rs = ps.executeQuery();
-                                        int count = 0;
-                                        while (rs.next()) {
-                                            count++;
-                                            System.out.print("PostID:" + rs.getInt("ID"));
-                                            System.out.println();
-                                            System.out.print("title:" + rs.getString("title"));
-                                            System.out.println();
-                                            System.out.print("content:" + rs.getString("content"));
-                                            System.out.println();
-                                            System.out.print("categories:");
-                                            //category
-                                            String sql1 = "SELECT * from category_post where post_id = ?";
-                                            PreparedStatement ps1 = con.prepareStatement(sql1);
-                                            ps1.setInt(1, rs.getInt("ID"));
-                                            ResultSet rs1 = ps1.executeQuery();
-                                            while (rs1.next()) {
-                                                System.out.print(rs1.getString("category") + "/");
-                                            }
-                                            System.out.println();
-                                            //reply
-                                            System.out.print("number of like:");
-                                            String sql2 = "SELECT count(*) from like_post where post_id = ? ";
-                                            PreparedStatement ps2 = con.prepareStatement(sql2);
-                                            ps2.setInt(1, rs.getInt("ID"));
-                                            ResultSet rs2 = ps2.executeQuery();
-                                            rs2.next();
-                                            System.out.print(rs2.getInt(1));
-                                            //favourite
-                                            System.out.println();
-                                            System.out.print("number of favourite:");
-                                            String sql3 = "SELECT count(*) from author_favorited where post_id = ? ";
-                                            PreparedStatement ps3 = con.prepareStatement(sql3);
-                                            ps3.setInt(1, rs.getInt("ID"));
-                                            ResultSet rs3 = ps3.executeQuery();
-                                            rs3.next();
-                                            System.out.print(rs3.getInt(1));
-                                            System.out.println();
-                                            System.out.println("---------------------------------------------------------");
-                                        }
-                                        if (count == 0) {
-                                            System.out.println("none");
-                                        }
+                                        printPost(rs);
                                         break;
                                     }
 
-                                    case "reply": {
+                                    case "replied post": {
                                         sql = "SELECT * from replies where author_name= ?;";
                                         PreparedStatement ps = con.prepareStatement(sql);
                                         ps.setString(1, authorName);
                                         ResultSet rs = ps.executeQuery();
                                         int count = 0;
                                         while (rs.next()) {
+                                            String sql1 = "SELECT * FROM posts where id = ?;";
+                                            PreparedStatement ps1 = con.prepareStatement(sql1);
+                                            ps1.setInt(1,rs.getInt("postID"));
+                                            ResultSet rs1 = ps1.executeQuery();
+                                            printPost(rs1);
                                             count++;
-                                            System.out.println("PostID:" + rs.getInt("postID"));
+//                                            System.out.println("PostID:" + rs.getInt("postID"));
                                             System.out.print("replyID:" + rs.getInt("reply_id"));
                                             System.out.println();
                                             System.out.println("reply author:" + rs.getString("author_name"));
@@ -438,6 +402,7 @@ public class server {
                                             System.out.println();
                                             System.out.print("number of stars:" + rs.getInt("stars"));
                                             System.out.println();
+                                            System.out.println("---------------------------------------------------------");
                                             System.out.println("---------------------------------------------------------");
                                         }
                                         if (count == 0) {
@@ -508,6 +473,8 @@ public class server {
                                     }
 
                                 }
+                            }else{
+                                System.out.println("you haven't log in");
                             }
                             break;
                         }
@@ -684,6 +651,49 @@ public class server {
 //        System.out.println(end - start);
 //        System.out.println("Loading speed : " + (cnt * 1000L) / (end - start) + " records/s");
     }
-
+    public static void printPost(ResultSet rs) throws SQLException {
+        int count = 0;
+        while (rs.next()) {
+            count++;
+            System.out.print("PostID:" + rs.getInt("ID"));
+            System.out.println();
+            System.out.print("title:" + rs.getString("title"));
+            System.out.println();
+            System.out.print("content:" + rs.getString("content"));
+            System.out.println();
+            System.out.print("categories:");
+            //category
+            String sql1 = "SELECT * from category_post where post_id = ?";
+            PreparedStatement ps1 = con.prepareStatement(sql1);
+            ps1.setInt(1, rs.getInt("ID"));
+            ResultSet rs1 = ps1.executeQuery();
+            while (rs1.next()) {
+                System.out.print(rs1.getString("category") + "/");
+            }
+            System.out.println();
+            //reply
+            System.out.print("number of like:");
+            String sql2 = "SELECT count(*) from like_post where post_id = ? ";
+            PreparedStatement ps2 = con.prepareStatement(sql2);
+            ps2.setInt(1, rs.getInt("ID"));
+            ResultSet rs2 = ps2.executeQuery();
+            rs2.next();
+            System.out.print(rs2.getInt(1));
+            //favourite
+            System.out.println();
+            System.out.print("number of favourite:");
+            String sql3 = "SELECT count(*) from author_favorited where post_id = ? ";
+            PreparedStatement ps3 = con.prepareStatement(sql3);
+            ps3.setInt(1, rs.getInt("ID"));
+            ResultSet rs3 = ps3.executeQuery();
+            rs3.next();
+            System.out.print(rs3.getInt(1));
+            System.out.println();
+            System.out.println("---------------------------------------------------------");
+        }
+        if (count == 0) {
+            System.out.println("none");
+        }
+    }
 
 }
