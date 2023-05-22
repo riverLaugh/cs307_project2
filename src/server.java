@@ -147,8 +147,8 @@ public class server {
             start = System.currentTimeMillis();
             openDB(prop);
             setPrepareStatement();
-            boolean isLogin = true;
-            String authorName = "gold_net";
+            boolean isLogin = false;
+            String authorName = "";
             String authorId = "";
             String authorPhone = "";
             String author_registration_time = "";
@@ -157,14 +157,13 @@ public class server {
             String title = "";
             while (true) {
                 String sql = "";
-                String a = in.next(); //命令 ：reg author_name password
+                String a = in.nextLine(); //命令 ：reg author_name password
                 if (!a.equalsIgnoreCase("quit")) {
-                    String[] cmd = a.trim().split(" ");
-                    switch (cmd[0].toLowerCase(Locale.ROOT)) {
+                    switch (a.toLowerCase(Locale.ROOT)) {
                         case "register": { //reg author_name
                             System.out.print("Please input your name: ");
                             //判断author是否已被注册
-                            String b = in.next();
+                            String b = in.nextLine();
                             sql = "SELECT *\n" +
                                     "from authors\n" +
                                     "where author_name = ?;";
@@ -175,7 +174,7 @@ public class server {
                                 System.out.print("The name has already been registered");
                             } else {
                                 System.out.print("Input your password: ");
-                                String password = in.next();
+                                String password = in.nextLine();
                                 System.out.print("confirm your password: ");
                                 if (Objects.equals(password, in.next())) {
                                     System.out.print("Input your phone number: ");
@@ -302,10 +301,12 @@ public class server {
                             break;
                         }
 
+
                         case "secondreply": {//reply reply_id content
                             if (isLogin) {
                                 System.out.print("The reply you want to reply is: ");
                                 int b = in.nextInt();
+                                in.nextLine();
                                 sql = "SELECT *\n" +
                                         "from replies\n" +
                                         "where reply_id = ?;";
@@ -313,14 +314,14 @@ public class server {
                                 ps.setInt(1, b);
                                 ResultSet rs = ps.executeQuery();
                                 if (rs.next()) {
-                                    String sql1 = "SELECT * FROM replies ORDER BY reply_id DESC LIMIT 1";
+                                    String sql1 = "SELECT * FROM second_replies ORDER BY id DESC LIMIT 1";
                                     PreparedStatement ps1 = con.prepareStatement(sql1);
                                     ResultSet rs1 = ps1.executeQuery();
                                     if (rs1.next()) {
                                         stmtSecondReply.setInt(1, rs1.getInt("id") + 1);
                                         stmtSecondReply.setInt(2, 0);
                                         System.out.print("content: ");
-                                        content = in.next();
+                                        content = in.nextLine();
                                         stmtSecondReply.setString(3, authorName);
                                         stmtSecondReply.setString(4, content);
                                         stmtSecondReply.addBatch();
@@ -348,10 +349,11 @@ public class server {
                                 if (rs1.next()) {
                                     stmtPost.setInt(1, rs1.getInt("ID") + 1);
                                     System.out.print("Your post's title is: ");
-                                    title = in.next();
+                                    in.nextLine();
+                                    title = in.nextLine();
                                     stmtPost.setString(2, title);
                                     System.out.print("content: ");
-                                    content = in.next();
+                                    content = in.nextLine();
                                     stmtPost.setString(3, content);
                                     stmtPost.setTimestamp(4, Timestamp.valueOf(getCurrentTime()));
                                     stmtPost.setString(5, "Shenzhen");
@@ -368,10 +370,9 @@ public class server {
                         case "list": {
                             //checklist follow or like or.....
                             if (isLogin) {
-                                System.out.print("Please input what list you want to search(follow/like/favorite):");
-                                String type = in.next();
+                                System.out.print("Please input what list you want to search(follow/like/favorite/post/reply):");
+                                String type = in.nextLine();
                                 switch (type.toLowerCase(Locale.ROOT)) {
-
                                     case "post": {
                                         sql = "SELECT * FROM posts where author_name = ?;";
                                         PreparedStatement ps = con.prepareStatement(sql);
@@ -430,7 +431,7 @@ public class server {
                                         int count = 0;
                                         while (rs.next()) {
                                             count++;
-                                            System.out.println("PostID:"+rs.getInt("postID"));
+                                            System.out.println("PostID:" + rs.getInt("postID"));
                                             System.out.print("replyID:" + rs.getInt("reply_id"));
                                             System.out.println();
                                             System.out.println("reply author:" + rs.getString("author_name"));
@@ -440,7 +441,7 @@ public class server {
                                             System.out.println();
                                             System.out.println("---------------------------------------------------------");
                                         }
-                                        if(count==0){
+                                        if (count == 0) {
                                             System.out.println("you don't have reply");
                                         }
                                         break;
@@ -503,7 +504,9 @@ public class server {
                                         break;
                                     }
 
-                                    default:
+                                    default: {
+                                        System.out.println("wrong list type");
+                                    }
 
                                 }
                             }
@@ -515,7 +518,7 @@ public class server {
                             //判断author是否存在
                             if (isLogin) {
                                 System.out.print("Please input the author:");
-                                String followed_author = in.next();
+                                String followed_author = in.nextLine();
                                 if (Objects.equals(followed_author, "quit")) {
                                     System.out.println("you have quited during this command process");
                                     continue;
@@ -542,34 +545,38 @@ public class server {
 
                         case "login": {
                             //login author_name
-                            System.out.print("author:");
-                            authorName = in.next();
-                            sql = "SELECT *\n" +
-                                    "from authors\n" +
-                                    "where author_name = ?;";
-                            PreparedStatement ps = con.prepareStatement(sql);
-                            ps.setString(1, authorName);
-                            ResultSet rs = ps.executeQuery();
-                            if (rs.next()) {
-                                String password = rs.getString("password");
-                                System.out.print("Password:");
-                                if (Objects.equals(in.next(), password)) {
-                                    isLogin = true;
-                                    System.out.println("login in successfully");
+                            if (!isLogin) {
+                                System.out.print("author:");
+                                authorName = in.nextLine();
+                                sql = "SELECT *\n" +
+                                        "from authors\n" +
+                                        "where author_name = ?;";
+                                PreparedStatement ps = con.prepareStatement(sql);
+                                ps.setString(1, authorName);
+                                ResultSet rs = ps.executeQuery();
+                                if (rs.next()) {
+                                    String password = rs.getString("password");
+                                    System.out.print("Password:");
+                                    if (Objects.equals(in.nextLine(), password)) {
+                                        isLogin = true;
+                                        System.out.println("login in successfully");
+                                    } else {
+                                        System.out.println("your password is wrong");
+                                        System.out.println(password);
+                                    }
                                 } else {
-                                    System.out.println("your password is wrong");
-                                    System.out.println(password);
+                                    System.out.println("author isn't existing.Please register first");
                                 }
                             } else {
-                                System.out.println("author isn't existing.Please register first");
+                                System.out.println("you have login.Please log out first");
                             }
                             break;
                         }
 
-                        case "undofollow": {
+                        case "undo follow": {
                             if (isLogin) {
                                 System.out.print("author:");
-                                String unAuthor = in.next();
+                                String unAuthor = in.nextLine();
                                 sql = "SELECT *\n" +
                                         "from authors\n" +
                                         "where author_name = ?;";
@@ -593,22 +600,21 @@ public class server {
                                         ps1.setString(2, authorName);
                                         int isUndo = ps1.executeUpdate();
                                         if (isUndo > 0) {
-                                            System.out.print("You successfully unfollowed this author");
-                                        }else {
-                                            System.out.print("something wrong");
+                                            System.out.println("You successfully unfollowed this author");
+                                        } else {
+                                            System.out.println("something wrong");
                                         }
                                     } else {
-                                        System.out.print("You haven't followed the author");
+                                        System.out.println("You haven't followed the author");
                                     }
                                 } else {
-                                    System.out.print("author isn't existing.");
+                                    System.out.println("author isn't existing.");
                                 }
                             } else {
-                                System.out.print("You have not logged in yet");
+                                System.out.println("You have not logged in yet");
                             }
                             break;
                         }
-
 
 
                         case "search": {
@@ -620,7 +626,7 @@ public class server {
 
                         case "block": {
                             System.out.print("which author do you want to block");//还需要把前面的命令改了
-                            String bcked = in.next();
+                            String bcked = in.nextLine();
                             sql = "INSERT INTO public.blocklist(author_name, blocked_name) VALUES (?,?) ON CONFLICT (author_name,blocked_name) DO NOTHING ;";
                             PreparedStatement ps = con.prepareStatement(sql);
                             ps.setString(1, authorName);
@@ -628,6 +634,7 @@ public class server {
                             ps.executeQuery();
 
                         }
+
                         case "help": {
                             System.out.println("command: ");
                             System.out.println("--register: register an author");
@@ -642,8 +649,8 @@ public class server {
                             System.out.println("--follow: follow an author");
                         }
 
-                        default:{
-
+                        default: {
+                            System.out.println("wrong command");
                         }
                     }
                     stmtLike.executeBatch();
