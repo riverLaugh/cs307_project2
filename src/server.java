@@ -147,8 +147,8 @@ public class server {
             start = System.currentTimeMillis();
             openDB(prop);
             setPrepareStatement();
-            boolean isLogin = false;
-            String authorName = "";
+            boolean isLogin = true;
+            String authorName = "gold_net";
             String authorId = "";
             String authorPhone = "";
             String author_registration_time = "";
@@ -162,8 +162,8 @@ public class server {
                     String[] cmd = a.trim().split(" ");
                     switch (cmd[0].toLowerCase(Locale.ROOT)) {
                         case "register": { //reg author_name
-                            //判断author是否已被注册
                             System.out.print("Please input your name: ");
+                            //判断author是否已被注册
                             String b = in.next();
                             sql = "SELECT *\n" +
                                     "from authors\n" +
@@ -191,8 +191,8 @@ public class server {
                         }
 
                         case "like": {//like post_id
-                            //判断此post_id是否存在
                             if (isLogin) {
+                                //判断此post_id是否存在
                                 System.out.print("The post you like is: ");
                                 int b = in.nextInt();
                                 sql = "SELECT *\n" +
@@ -216,8 +216,8 @@ public class server {
                         }
 
                         case "favorite": {//favorite post_id
-                            //判断此post_id是否存在
                             if (isLogin) {
+                                //判断此post_id是否存在
                                 System.out.print("The post you favorite is: ");
                                 int b = in.nextInt();
                                 sql = "SELECT *\n" +
@@ -241,8 +241,8 @@ public class server {
                         }
 
                         case "share": {//share post_id
-                            //判断此post_id是否存在
                             if (isLogin) {
+                                //判断此post_id是否存在
                                 System.out.print("The post you share is: ");
                                 int b = in.nextInt();
                                 sql = "SELECT *\n" +
@@ -269,6 +269,7 @@ public class server {
                             if (isLogin) {
                                 System.out.print("The post you reply is: ");
                                 int b = in.nextInt();
+                                in.nextLine();
                                 sql = "SELECT *\n" +
                                         "from posts\n" +
                                         "where id = ?;";
@@ -282,7 +283,7 @@ public class server {
                                     if (r.next()) {
                                         stmtReply.setInt(1, r.getInt("reply_id") + 1);
                                         System.out.print("content: ");
-                                        content = in.next();
+                                        content = in.nextLine();
                                         stmtReply.setInt(2, b);
                                         stmtReply.setString(3, content);
                                         stmtReply.setInt(4, 0);
@@ -338,6 +339,7 @@ public class server {
                             }
                             break;
                         }
+
                         case "post": {//post content
                             if (isLogin) {
                                 String sql1 = "SELECT * FROM posts ORDER BY ID DESC LIMIT 1";
@@ -378,43 +380,46 @@ public class server {
                                         int count = 0;
                                         while (rs.next()) {
                                             count++;
-                                            System.out.print("PostID:" + rs.getString("ID"));
+                                            System.out.print("PostID:" + rs.getInt("ID"));
                                             System.out.println();
                                             System.out.print("title:" + rs.getString("title"));
                                             System.out.println();
-                                            System.out.print("content:" + rs.getString("title"));
+                                            System.out.print("content:" + rs.getString("content"));
                                             System.out.println();
                                             System.out.print("categories:");
                                             //category
                                             String sql1 = "SELECT * from category_post where post_id = ?";
                                             PreparedStatement ps1 = con.prepareStatement(sql1);
-                                            ps1.setString(1,rs.getString("ID"));
-                                            ResultSet rs1 = ps.executeQuery();
-                                            while(rs1.next()){
-                                                System.out.print(rs1.getString("category")+" ");
+                                            ps1.setInt(1, rs.getInt("ID"));
+                                            ResultSet rs1 = ps1.executeQuery();
+                                            while (rs1.next()) {
+                                                System.out.print(rs1.getString("category") + "/");
                                             }
                                             System.out.println();
                                             //reply
                                             System.out.print("number of like:");
                                             String sql2 = "SELECT count(*) from like_post where post_id = ? ";
                                             PreparedStatement ps2 = con.prepareStatement(sql2);
-                                            ps2.setString(1,rs.getString("ID"));
+                                            ps2.setInt(1, rs.getInt("ID"));
                                             ResultSet rs2 = ps2.executeQuery();
+                                            rs2.next();
                                             System.out.print(rs2.getInt(1));
                                             //favourite
                                             System.out.println();
                                             System.out.print("number of favourite:");
                                             String sql3 = "SELECT count(*) from author_favorited where post_id = ? ";
                                             PreparedStatement ps3 = con.prepareStatement(sql3);
-                                            ps3.setString(1,rs.getString("ID"));
+                                            ps3.setInt(1, rs.getInt("ID"));
                                             ResultSet rs3 = ps3.executeQuery();
+                                            rs3.next();
                                             System.out.print(rs3.getInt(1));
                                             System.out.println();
-                                            System.out.print("---------------------------------------------------------");
+                                            System.out.println("---------------------------------------------------------");
                                         }
                                         if (count == 0) {
                                             System.out.println("none");
                                         }
+                                        break;
                                     }
 
                                     case "reply": {
@@ -422,19 +427,23 @@ public class server {
                                         PreparedStatement ps = con.prepareStatement(sql);
                                         ps.setString(1, authorName);
                                         ResultSet rs = ps.executeQuery();
+                                        int count = 0;
                                         while (rs.next()) {
-                                            System.out.print("replyID:");
+                                            count++;
+                                            System.out.println("PostID:"+rs.getInt("postID"));
+                                            System.out.print("replyID:" + rs.getInt("reply_id"));
                                             System.out.println();
-                                            System.out.print("content:");
+                                            System.out.println("reply author:" + rs.getString("author_name"));
+                                            System.out.print("content:" + rs.getString("content"));
                                             System.out.println();
-                                            System.out.print("number of stars:");
+                                            System.out.print("number of stars:" + rs.getInt("stars"));
                                             System.out.println();
-                                            System.out.print("time:");
-                                            System.out.println();
-                                            System.out.print("---------------------------------------------------------");
+                                            System.out.println("---------------------------------------------------------");
                                         }
-
-
+                                        if(count==0){
+                                            System.out.println("you don't have reply");
+                                        }
+                                        break;
                                     }
 
                                     case "follow": {
@@ -494,6 +503,8 @@ public class server {
                                         break;
                                     }
 
+                                    default:
+
                                 }
                             }
                             break;
@@ -517,12 +528,14 @@ public class server {
                                 ResultSet rs = ps.executeQuery();
                                 if (rs.next()) {
                                     stmtFollow.setString(1, authorName);
-                                    stmtFollow.setString(2, cmd[1]);
+                                    stmtFollow.setString(2, followed_author);
                                     stmtFollow.addBatch();
                                     System.out.println("follow successfully.");
                                 } else {
                                     System.out.println("this author doesn't exist.");
                                 }
+                            } else {
+                                System.out.println("not log in");
                             }
                             break;
                         }
@@ -553,9 +566,49 @@ public class server {
                             break;
                         }
 
-                        case "undo follow": {
-
+                        case "undofollow": {
+                            if (isLogin) {
+                                System.out.print("author:");
+                                String unAuthor = in.next();
+                                sql = "SELECT *\n" +
+                                        "from authors\n" +
+                                        "where author_name = ?;";
+                                PreparedStatement ps = con.prepareStatement(sql);
+                                ps.setString(1, unAuthor);
+                                ResultSet rs = ps.executeQuery();
+                                if (rs.next()) {
+                                    String sql2 = "SELECT *\n" +
+                                            "from author_followed\n" +
+                                            "where followed_author_name = ? and author_name = ?;";
+                                    PreparedStatement ps2 = con.prepareStatement(sql2);
+                                    ps2.setString(1, unAuthor);
+                                    ps2.setString(2, authorName);
+                                    ResultSet rs2 = ps2.executeQuery();
+                                    if (rs2.next()) {
+                                        String sql1 = "DELETE\n" +
+                                                "from author_followed\n" +
+                                                "where followed_author_name = ? and author_name = ?;";
+                                        PreparedStatement ps1 = con.prepareStatement(sql1);
+                                        ps1.setString(1, unAuthor);
+                                        ps1.setString(2, authorName);
+                                        int isUndo = ps1.executeUpdate();
+                                        if (isUndo > 0) {
+                                            System.out.print("You successfully unfollowed this author");
+                                        }else {
+                                            System.out.print("something wrong");
+                                        }
+                                    } else {
+                                        System.out.print("You haven't followed the author");
+                                    }
+                                } else {
+                                    System.out.print("author isn't existing.");
+                                }
+                            } else {
+                                System.out.print("You have not logged in yet");
+                            }
+                            break;
                         }
+
 
 
                         case "search": {
@@ -587,6 +640,10 @@ public class server {
                             System.out.println("--second reply: reply a reply");
                             System.out.println("--list: check some lists about yourself");
                             System.out.println("--follow: follow an author");
+                        }
+
+                        default:{
+
                         }
                     }
                     stmtLike.executeBatch();
