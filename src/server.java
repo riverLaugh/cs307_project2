@@ -171,7 +171,7 @@ public class server {
                             ps.setString(1, b);
                             ResultSet rs = ps.executeQuery();
                             if (rs.next()) {
-                                System.out.print("The name has already been registered");
+                                System.out.println("The name has already been registered");
                             } else {
                                 System.out.print("Input your password: ");
                                 String password = in.nextLine();
@@ -300,7 +300,6 @@ public class server {
                             }
                             break;
                         }
-
 
                         case "secondreply": {//reply reply_id content
                             if (isLogin) {
@@ -616,12 +615,11 @@ public class server {
                             break;
                         }
 
-
                         case "search": {
                             //search for post / author /
                             System.out.println("if you don't want to find this ");
 
-
+                            break;
                         }
 
                         case "block": {
@@ -632,7 +630,7 @@ public class server {
                             ps.setString(1, authorName);
                             ps.setString(2, bcked);
                             ps.executeQuery();
-
+                            break;
                         }
 
                         case "help": {
@@ -647,6 +645,7 @@ public class server {
                             System.out.println("--second reply: reply a reply");
                             System.out.println("--list: check some lists about yourself");
                             System.out.println("--follow: follow an author");
+                            break;
                         }
 
                         default: {
