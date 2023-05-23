@@ -38,7 +38,7 @@ public class insert {
             System.err.println("Cannot find the Postgres driver. Check CLASSPATH.");
             System.exit(1);
         }
-        String url = "jdbc:postgresql://" + prop.getProperty("host") + "/" + prop.getProperty("database")+"?characterEncoding=UTF-8";
+        String url = "jdbc:postgresql://" + prop.getProperty("host") +":" +prop.getProperty("port")+ "/" + prop.getProperty("database")+"?characterEncoding=UTF-8";
         try {
             con = DriverManager.getConnection(url, prop);
             if (con != null) {
@@ -55,17 +55,17 @@ public class insert {
 
     public static void setPrepareStatement() {
         try {
-            stmtPost = con.prepareStatement("INSERT INTO public.posts (ID,title,content,posting_time,posting_city,author_name) " +
+            stmtPost = con.prepareStatement("INSERT INTO gaussdb.posts (ID,title,content,posting_time,posting_city,author_name) " +
                     "VALUES (?,?,?,?,?,?);");
-            stmtAuthor = con.prepareStatement("INSERT INTO public.authors (author_id,author_registration_time,author_phone,author_name,password) VALUES (?,?,?,?,'111') ON CONFLICT (author_name) DO NOTHING ;");
-            stmtFollow = con.prepareStatement("INSERT INTO public.author_followed (author_name,followed_author_name)" + "VALUES (?,?) ON CONFLICT(author_name,followed_author_name) DO NOTHING;");
-            stmtFavr = con.prepareStatement("INSERT INTO public.author_favorited (post_id,favorited_author_name)" + "VALUES (?,?) ON CONFLICT(post_id,favorited_author_name) DO NOTHING;");
-            stmtShare = con.prepareStatement("INSERT INTO public.share_author (post_id,shared_author_name)" + "VALUES (?,?) ON CONFLICT (post_id,shared_author_name) DO NOTHING;");
-            stmtLike = con.prepareStatement("INSERT INTO public.like_post (post_id,author_name)" + "VALUES (?,?) ON CONFLICT (post_id,author_name) DO NOTHING;");
-            stmtCate = con.prepareStatement("INSERT INTO public.category_post(post_id,category)" + "VALUES (?,?) ON CONFLICT (post_id,category) DO NOTHING;");
-            stmtReply = con.prepareStatement("INSERT INTO public.replies (reply_id,postID,content,stars,author_name) VALUES (?,?,?,?,?) ON CONFLICT (postID,content,stars,author_name) DO NOTHING;");
-            stmtSecondReply = con.prepareStatement("INSERT INTO public.second_replies (id,stars,author_name,content) VALUES (?,?,?,?) ON CONFLICT (stars,author_name,content) DO NOTHING;");
-            stmtReToSecRe = con.prepareStatement("INSERT INTO public.replies_to_second_replies (reply_id,second_reply_id) VALUES (?,?) ON CONFLICT (reply_id,second_reply_id) DO NOTHING;");
+            stmtAuthor = con.prepareStatement("INSERT INTO gaussdb.authors (author_id,author_registration_time,author_phone,author_name,password) VALUES (?,?,?,?,'111') ON DUPLICATE KEY UPDATE NOTHING;");
+            stmtFollow = con.prepareStatement("INSERT INTO gaussdb.author_followed (author_name,followed_author_name)" + "VALUES (?,?) ON DUPLICATE KEY UPDATE NOTHING;");
+            stmtFavr = con.prepareStatement("INSERT INTO gaussdb.author_favorited (post_id,favorited_author_name)" + "VALUES (?,?) ON DUPLICATE KEY UPDATE NOTHING;");
+            stmtShare = con.prepareStatement("INSERT INTO gaussdb.share_author (post_id,shared_author_name)" + "VALUES (?,?) ON DUPLICATE KEY UPDATE NOTHING;");
+            stmtLike = con.prepareStatement("INSERT INTO gaussdb.like_post (post_id,author_name)" + "VALUES (?,?) ON DUPLICATE KEY UPDATE NOTHING;");
+            stmtCate = con.prepareStatement("INSERT INTO gaussdb.category_post(post_id,category)" + "VALUES (?,?) ON DUPLICATE KEY UPDATE NOTHING;");
+            stmtReply = con.prepareStatement("INSERT INTO gaussdb.replies (reply_id,postID,content,stars,author_name) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE NOTHING;");
+            stmtSecondReply = con.prepareStatement("INSERT INTO gaussdb.second_replies (id,stars,author_name,content) VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE NOTHING;");
+            stmtReToSecRe = con.prepareStatement("INSERT INTO gaussdb.replies_to_second_replies (reply_id,second_reply_id) VALUES (?,?) ON DUPLICATE KEY UPDATE NOTHING;");
         } catch (SQLException e) {
             System.err.println("Insert statement failed");
             System.err.println(e.getMessage());

@@ -1,3 +1,5 @@
 .idea/*
-
+javafx-sdk-20.0.1/*
 *.iml
+postgresql-42.2.20.jar
+GaussDB_opengauss_client_tools
