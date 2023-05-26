@@ -54,6 +54,7 @@ public class server {
 
     public static void setPrepareStatement() {
         try {
+            stmtSearch = con.prepareStatement("INSERT INTO public.search_record (post_id,author_name) VALUES (?,?) ON CONFLICT (post_id,author_name) DO NOTHING;");
             stmtPost = con.prepareStatement("INSERT INTO gaussdb.posts (ID,title,content,posting_time,posting_city,author_name) " +
                     "VALUES (?,?,?,?,?,?);");
             stmtAuthor = con.prepareStatement("INSERT INTO gaussdb.authors (author_id,author_registration_time,author_phone,author_name,password) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE NOTHING;");
@@ -676,91 +677,6 @@ public class server {
                             System.out.println("--follow: follow an author");
                             break;
                         }
-                        case "search": {
-                            //search for post / author /
-//                            System.out.println("if you don't want to find this ");
-                            if (isLogin) {
-                                System.out.print("You want to search according to (key/time/cate): ");
-                                String type = in.nextLine();
-                                switch (type.toLowerCase(Locale.ROOT)) {
-
-                                    case "key": {
-                                        System.out.println("The key words you want to search: ");
-                                        String key = in.nextLine();
-                                        sql = "SELECT *\n" +
-                                                "from posts\n" +
-                                                "where title like ? or content like ?;";
-                                        PreparedStatement ps = con.prepareStatement(sql);
-                                        ps.setString(1, "%" + key + "%");
-                                        ps.setString(2, "%" + key + "%");
-                                        ResultSet rs = ps.executeQuery();
-                                        printPost(rs);
-                                        if (rs.next()) {
-                                            stmtSearch.setInt(1, rs.getInt("id"));
-                                            stmtSearch.setString(2,authorName);
-                                        }
-                                        break;
-                                    }
-
-                                    case "time": {
-                                        System.out.println("Enter year: ");
-                                        int year = Integer.parseInt(in.nextLine());
-                                        System.out.println("Enter month: ");
-                                        int month = Integer.parseInt(in.nextLine());
-                                        System.out.println("Ending year: ");
-                                        int year1 = Integer.parseInt(in.nextLine());
-                                        System.out.println("Ending month: ");
-                                        int month1 = Integer.parseInt(in.nextLine());
-                                        String startDateTime = String.format("%04d-%02d-01 00:00:00", year, month);
-                                        String endDateTime = String.format("%04d-%02d-31 23:59:59", year1, month1);
-                                        sql = "SELECT *\n" +
-                                                "from posts\n" +
-                                                "where posting_time>=? and posting_time <=?";
-                                        PreparedStatement ps = con.prepareStatement(sql);
-                                        ps.setTimestamp(1, Timestamp.valueOf(startDateTime));
-                                        ps.setTimestamp(2, Timestamp.valueOf(endDateTime));
-                                        ResultSet rs = ps.executeQuery();
-                                        printPost(rs);
-                                        if (rs.next()) {
-                                            stmtSearch.setInt(1, rs.getInt("id"));
-                                            stmtSearch.setString(2,authorName);
-                                        }
-                                        break;
-                                    }
-
-                                    case "cate": {
-                                        System.out.println("The category you want to search: ");
-                                        String cate = in.nextLine();
-                                        sql = "SELECT *\n" +
-                                                "from category_post\n" +
-                                                "where category = ?";
-                                        PreparedStatement ps = con.prepareStatement(sql);
-                                        ps.setString(1, cate);
-                                        ResultSet rs = ps.executeQuery();
-                                        if (rs.next()) {
-                                            int id = rs.getInt("post_id");
-                                            String sql1 = "SELECT *\n" +
-                                                    "from posts\n" +
-                                                    "where id = ?;";
-                                            PreparedStatement ps1 = con.prepareStatement(sql1);
-                                            ps1.setInt(1, id);
-                                            ResultSet rs1 = ps1.executeQuery();
-                                            printPost(rs1);
-                                            if (rs1.next()) {
-                                                stmtSearch.setInt(1, rs.getInt("id"));
-                                                stmtSearch.setString(2,authorName);
-                                            }
-                                        } else {
-                                            System.out.println("This category does not exist.");
-                                        }
-                                        break;
-                                    }
-                                }
-                            } else {
-                                System.out.println("You have not logged in yet");
-                            }
-                            break;
-                        }
 
                         case "anonymous": {
                             if (isLogin) {
@@ -876,6 +792,75 @@ public class server {
                             break;
                         }
 
+                        case "hot": {
+                            sql = "SELECT post_id, COUNT(post_id) AS times\n" +
+                                    "FROM search_record\n" +
+                                    "GROUP BY post_id\n" +
+                                    "ORDER BY times DESC\n" +
+                                    "LIMIT 10;";
+                            PreparedStatement ps = con.prepareStatement(sql);
+                            ResultSet rs = ps.executeQuery();
+                            while (rs.next()) {
+                                int postId = rs.getInt("post_id");
+                                int times = rs.getInt("times");
+                                System.out.println("Post ID: " + postId + ", Times: " + times);
+                            }
+                            break;
+                        }
+
+                        case "search": {
+                            if (isLogin) {
+                                System.out.print("Enter year and month (YYYY-MM): ");
+                                String yearMonthInput = in.nextLine();
+                                System.out.print("Enter ending year and month (YYYY-MM): ");
+                                String endYearMonthInput = in.nextLine();
+                                System.out.print("Enter category: ");
+                                String category = in.nextLine();
+                                System.out.print("Enter key: ");
+                                String key = in.nextLine();
+
+                                sql = "SELECT p.* FROM posts p " +
+                                        "JOIN category_post cp ON p.id = cp.post_id " +
+                                        "WHERE 1=1";
+                                if (!yearMonthInput.equalsIgnoreCase("all") && !endYearMonthInput.equalsIgnoreCase("all")) {
+                                    sql += " AND p.posting_time >= ? AND p.posting_time <= ?";
+                                }
+                                if (!category.isEmpty() && !category.equalsIgnoreCase("all")) {
+                                    sql += " AND cp.category = ?";
+                                }
+                                if (!key.isEmpty() && !key.equalsIgnoreCase("all")) {
+                                    sql += " AND (p.title LIKE ? OR p.content LIKE ?)";
+                                }
+
+                                PreparedStatement ps = con.prepareStatement(sql, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
+                                int paramIndex = 1;
+                                if (!yearMonthInput.equalsIgnoreCase("all") && !endYearMonthInput.equalsIgnoreCase("all")) {
+                                    String startDateTime = yearMonthInput + "-01 00:00:00";
+                                    String endDateTime = endYearMonthInput + "-31 23:59:59";
+                                    ps.setTimestamp(paramIndex++, Timestamp.valueOf(startDateTime));
+                                    ps.setTimestamp(paramIndex++, Timestamp.valueOf(endDateTime));
+                                }
+                                if (!category.isEmpty() && !category.equalsIgnoreCase("all")) {
+                                    ps.setString(paramIndex++, category);
+                                }
+                                if (!key.isEmpty() && !key.equalsIgnoreCase("all")) {
+                                    ps.setString(paramIndex++, "%" + key + "%");
+                                    ps.setString(paramIndex++, "%" + key + "%");
+                                }
+
+                                ResultSet rs = ps.executeQuery();
+                                printPost(rs);
+                                rs.beforeFirst();
+                                while (rs.next()){
+                                    stmtSearch.setInt(1,rs.getInt("id"));
+                                    stmtSearch.setString(2,authorName);
+                                    stmtSearch.addBatch();
+                                }
+                            } else {
+                                System.out.println("You have not logged in yet");
+                            }
+                            break;
+                        }
 
 
                         default: {
@@ -959,5 +944,8 @@ public class server {
             System.out.println("none");
         }
     }
+
+
+
 
 }
