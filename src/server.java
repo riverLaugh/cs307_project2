@@ -1,4 +1,6 @@
 import java.io.*;
+import java.net.ServerSocket;
+import java.net.Socket;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.*;
@@ -11,6 +13,10 @@ import com.alibaba.fastjson.JSON;
 import java.util.concurrent.ThreadLocalRandom;
 
 public class server {
+    private static Socket clientSocket;
+    private static BufferedReader reader;
+    private static PrintWriter writer;
+
     private static final int BATCH_SIZE = 1000;
     private static Connection con = null;
     private ResultSet resultSet;
@@ -37,7 +43,7 @@ public class server {
             System.err.println("Cannot find the Postgres driver. Check CLASSPATH.");
             System.exit(1);
         }
-        String url = "jdbc:postgresql://" + prop.getProperty("host") +":" +prop.getProperty("port")+ "/" + prop.getProperty("database");
+        String url = "jdbc:postgresql://" + prop.getProperty("host") + "/" + prop.getProperty("database");
         try {
             con = DriverManager.getConnection(url, prop);
             if (con != null) {
@@ -54,7 +60,7 @@ public class server {
 
     public static void setPrepareStatement() {
         try {
-            stmtSearch = con.prepareStatement("INSERT INTO public.search_record (post_id,author_name) VALUES (?,?) ON CONFLICT (post_id,author_name) DO NOTHING;");
+            stmtSearch = con.prepareStatement("INSERT INTO gaussdb.search_record (post_id,author_name) VALUES (?,?) ON CONFLICT (post_id,author_name) DO NOTHING;");
             stmtPost = con.prepareStatement("INSERT INTO gaussdb.posts (ID,title,content,posting_time,posting_city,author_name) " +
                     "VALUES (?,?,?,?,?,?);");
             stmtAuthor = con.prepareStatement("INSERT INTO gaussdb.authors (author_id,author_registration_time,author_phone,author_name,password) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE NOTHING;");
@@ -99,7 +105,6 @@ public class server {
         }
     }
 
-
     public static void insertAuthor(String ID, String time, String phone, String name, String password) {
         try {
             stmtAuthor.setString(1, ID);
@@ -136,816 +141,1178 @@ public class server {
         return randomString;
     }
 
-
-    public static void main(String[] args) {
-        Scanner in = new Scanner(System.in);
-        Properties prop = loadDBUser();
-        long start = 0;
-        long end = 0;
-        try {
-            String jsonStrings = Files.readString(Path.of("resources/posts.json"));
-            List<Post> posts = JSON.parseArray(jsonStrings, Post.class);
-            String jsonString = Files.readString(Path.of("resources/replies.json"));
-            List<Replies> replies = JSON.parseArray(jsonString, Replies.class);
-            start = System.currentTimeMillis();
-            openDB(prop);
-            setPrepareStatement();
-            boolean isLogin = false;
-            String authorName = "";
-            String authorId = "";
-            String authorPhone = "";
-            String author_registration_time = "";
-            String content = "";
-            int stars;
-            String title = "";
-            while (true) {
-                String sql = "";
-                String a = in.nextLine(); //命令 ：reg author_name password
-                if (!a.equalsIgnoreCase("quit")) {
-                    switch (a.toLowerCase(Locale.ROOT)) {
-                        case "register": { //reg author_name
-                            System.out.print("Please input your name: ");
-                            //判断author是否已被注册
-                            String b = in.nextLine();
-                            sql = "SELECT *\n" +
-                                    "from authors\n" +
-                                    "where author_name = ?;";
-                            PreparedStatement ps = con.prepareStatement(sql);
-                            ps.setString(1, b);
-                            ResultSet rs = ps.executeQuery();
-                            if (rs.next()) {
-                                System.out.println("The name has already been registered");
-                            } else {
-                                System.out.print("Input your password: ");
-                                String password = in.nextLine();
-                                System.out.print("confirm your password: ");
-                                if (Objects.equals(password, in.next())) {
-                                    System.out.print("Input your phone number: ");
-                                    authorPhone = in.next();
-                                    authorName = b;
-                                    authorId = GenerateAuthorId();
-                                    author_registration_time = getCurrentTime();
-                                    insertAuthor(authorId, author_registration_time, authorPhone, authorName, password);
-                                    System.out.println("register is finished.Please login in.");
-                                }else{
-                                    System.out.println("wrong password");
-                                }
-                            }
-                            break;
-                        }
-
-                        case "like": {//like post_id
-                            if (isLogin) {
-                                //判断此post_id是否存在
-                                System.out.print("The post you like is: ");
-                                int b = in.nextInt();
-                                sql = "SELECT *\n" +
-                                        "from posts\n" +
-                                        "where id = ?;";
-                                PreparedStatement ps = con.prepareStatement(sql);
-                                ps.setInt(1, b);
-                                ResultSet rs = ps.executeQuery();
-                                if (rs.next()) {
-                                    stmtLike.setInt(1, b);
-                                    stmtLike.setString(2, authorName);
-                                    stmtLike.addBatch();
-                                    System.out.println("you like this post");
-                                } else {
-                                    System.out.print("This post doesn't exist");
-                                }
-                            } else {
-                                System.out.print("You have not logged in yet");
-                            }
-                            break;
-                        }
-
-                        case "favorite": {//favorite post_id
-                            if (isLogin) {
-                                //判断此post_id是否存在
-                                System.out.print("The post you favorite is: ");
-                                int b = in.nextInt();
-                                sql = "SELECT *\n" +
-                                        "from posts\n" +
-                                        "where id = ?;";
-                                PreparedStatement ps = con.prepareStatement(sql);
-                                ps.setInt(1, b);
-                                ResultSet rs = ps.executeQuery();
-                                if (rs.next()) {
-                                    stmtFavr.setInt(1, b);
-                                    stmtFavr.setString(2, authorName);
-                                    stmtFavr.addBatch();
-                                    System.out.println("you favorite this post.");
-                                } else {
-                                    System.out.print("This post doesn't exist.");
-                                }
-                            } else {
-                                System.out.print("You have not logged in yet");
-                            }
-                            break;
-                        }
-
-                        case "share": {//share post_id
-                            if (isLogin) {
-                                //判断此post_id是否存在
-                                System.out.print("The post you share is: ");
-                                int b = in.nextInt();
-                                sql = "SELECT *\n" +
-                                        "from posts\n" +
-                                        "where id = ?;";
-                                PreparedStatement ps = con.prepareStatement(sql);
-                                ps.setInt(1, b);
-                                ResultSet rs = ps.executeQuery();
-                                if (rs.next()) {
-                                    stmtShare.setInt(1, b);
-                                    stmtShare.setString(2, authorName);
-                                    stmtShare.addBatch();
-                                    System.out.println("you have share this post");
-                                } else {
-                                    System.out.print("This post doesn't exist");
-                                }
-                            } else {
-                                System.out.print("You have not logged in yet");
-                            }
-                            break;
-                        }
-
-                        case "reply": {//reply post_id content
-                            if (isLogin) {
-                                System.out.print("The post you reply is: ");
-                                int b = in.nextInt();
-                                in.nextLine();
-                                sql = "SELECT *\n" +
-                                        "from posts\n" +
-                                        "where id = ?;";
-                                PreparedStatement ps = con.prepareStatement(sql);
-                                ps.setInt(1, b);
-                                ResultSet rs = ps.executeQuery();
-                                if (rs.next()) {
-                                    String s = "SELECT * FROM replies ORDER BY reply_id DESC LIMIT 1";
-                                    PreparedStatement p = con.prepareStatement(s);
-                                    ResultSet r = p.executeQuery();
-                                    if (r.next()) {
-                                        stmtReply.setInt(1, r.getInt("reply_id") + 1);
-                                        System.out.print("content: ");
-                                        content = in.nextLine();
-                                        stmtReply.setInt(2, b);
-                                        stmtReply.setString(3, content);
-                                        stmtReply.setInt(4, 0);
-                                        stmtReply.setString(5, authorName);
-                                        stmtReply.addBatch();
-                                        System.out.println("reply successfully");
-                                    } else {
-                                        System.out.print("nothing");
-                                    }
-                                } else {
-                                    System.out.print("This post doesn't exist");
-                                }
-                            } else {
-                                System.out.print("You have not logged in yet");
-                            }
-                            break;
-                        }
-
-                        case "secondreply": {//reply reply_id content
-                            if (isLogin) {
-                                System.out.print("The reply you want to reply is: ");
-                                int b = in.nextInt();
-                                in.nextLine();
-                                sql = "SELECT *\n" +
-                                        "from replies\n" +
-                                        "where reply_id = ?;";
-                                PreparedStatement ps = con.prepareStatement(sql);
-                                ps.setInt(1, b);
-                                ResultSet rs = ps.executeQuery();
-                                if (rs.next()) {
-                                    String sql1 = "SELECT * FROM second_replies ORDER BY id DESC LIMIT 1";
-                                    PreparedStatement ps1 = con.prepareStatement(sql1);
-                                    ResultSet rs1 = ps1.executeQuery();
-                                    if (rs1.next()) {
-                                        stmtSecondReply.setInt(1, rs1.getInt("id") + 1);
-                                        stmtSecondReply.setInt(2, 0);
-                                        System.out.print("content: ");
-                                        content = in.nextLine();
-                                        stmtSecondReply.setString(3, authorName);
-                                        stmtSecondReply.setString(4, content);
-                                        stmtSecondReply.addBatch();
-                                        stmtReToSecRe.setInt(1, b);
-                                        stmtReToSecRe.setInt(2, rs1.getInt("id") + 1);
-                                        stmtReToSecRe.addBatch();
-                                    } else {
-                                        System.out.print("con not find");
-                                    }
-                                    System.out.print("reply successfully");
-                                } else {
-                                    System.out.print("This reply doesn't exist");
-                                }
-                            } else {
-                                System.out.print("You have not logged in yet");
-                            }
-                            break;
-                        }
-
-                        case "post": {//post content
-                            if (isLogin) {
-                                String sql1 = "SELECT * FROM posts ORDER BY ID DESC LIMIT 1";
-                                PreparedStatement ps1 = con.prepareStatement(sql1);
-                                ResultSet rs1 = ps1.executeQuery();
-                                if (rs1.next()) {
-                                    int id = rs1.getInt("ID") + 1;
-                                    stmtPost.setInt(1, rs1.getInt("ID") + 1);
-                                    System.out.print("Your post's title is: ");
-                                    title = in.nextLine();
-                                    stmtPost.setString(2, title);
-                                    System.out.print("content: ");
-                                    content = in.nextLine();
-                                    stmtPost.setString(3, content);
-                                    stmtPost.setTimestamp(4, Timestamp.valueOf(getCurrentTime()));
-                                    stmtPost.setString(5, "Shenzhen");
-                                    stmtPost.setString(6, authorName);
-                                    stmtPost.addBatch();
-                                    System.out.println("post successfully");
-                                } else {
-                                    int id = 1;
-                                    stmtPost.setInt(1, id);
-                                    System.out.print("Your post's title is: ");
-                                    title = in.nextLine();
-                                    stmtPost.setString(2, title);
-                                    System.out.print("content: ");
-                                    content = in.nextLine();
-                                    stmtPost.setString(3, content);
-                                    stmtPost.setTimestamp(4, Timestamp.valueOf(getCurrentTime()));
-                                    stmtPost.setString(5, "Shenzhen");
-                                    stmtPost.setString(6, authorName);
-                                    stmtPost.addBatch();
-                                    System.out.println("post successfully");
-                                }
-                            } else {
-                                System.out.print("You have not logged in yet");
-                            }
-                            break;
-                        }
-
-                        case "list": {
-                            //checklist follow or like or.....
-                            if (isLogin) {
-                                System.out.print("Please input what list you want to search(follow/like/favorite/post/replied post/share):");
-                                String type = in.nextLine();
-                                switch (type.toLowerCase(Locale.ROOT)) {
-
-                                    case "share": {
-                                        sql = "select *\n" +
-                                                "from share_author\n" +
-                                                "where shared_author_name = ?;";
-                                        PreparedStatement ps = con.prepareStatement(sql);
-                                        ps.setString(1, authorName);
-                                        ResultSet rs = ps.executeQuery();
-                                        if (rs.next()) {
-                                            System.out.println("post_id");
-                                            System.out.println(rs.getInt("post_id"));
-                                            while (rs.next()) {
-                                                System.out.println(rs.getInt("post_id"));
-                                            }
-                                        } else {
-                                            System.out.println("you don't share any posts");
-                                        }
-                                        break;
-                                    }
-
-
-                                    case "post": {
-                                        sql = "SELECT * FROM posts where author_name = ?;";
-                                        PreparedStatement ps = con.prepareStatement(sql);
-                                        ps.setString(1, authorName);
-                                        ResultSet rs = ps.executeQuery();
-
-                                        printPost(rs);
-                                        break;
-                                    }
-
-                                    case "reply": {
-                                        sql = "select *\n" +
-                                                "from replies\n" +
-                                                "where reply_id in (\n" +
-                                                "    select reply_id\n" +
-                                                "    from replies_to_second_replies\n" +
-                                                "    where second_reply_id in (select id from second_replies where author_name = ?))";
-                                        PreparedStatement ps = con.prepareStatement(sql);
-                                        ps.setString(1, authorName);
-                                        ResultSet rs = ps.executeQuery();
-                                        int count = 0;
-                                        while (rs.next()) {
-                                            count++;
-                                            System.out.print("replyID:" + rs.getInt("reply_id"));
-                                            System.out.println();
-                                            System.out.println("reply author:" + rs.getString("author_name"));
-                                            System.out.print("content:" + rs.getString("content"));
-                                            System.out.println();
-                                            System.out.print("number of stars: " + rs.getInt("stars"));
-                                            System.out.println();
-                                            System.out.println("---------------------------------------------------------");
-                                            System.out.println();
-                                        }
-                                        if(count==0){
-                                            System.out.println("you dont reply any reply");
-                                        }
-                                        break;
-                                    }
-
-                                    case "replied post": {
-                                        sql = "SELECT * from replies where author_name= ?;";
-                                        PreparedStatement ps = con.prepareStatement(sql);
-                                        ps.setString(1, authorName);
-                                        ResultSet rs = ps.executeQuery();
-                                        int count = 0;
-                                        while (rs.next()) {
-                                            String sql1 = "SELECT * FROM posts where id = ?;";
-                                            PreparedStatement ps1 = con.prepareStatement(sql1);
-                                            ps1.setInt(1, rs.getInt("postID"));
-                                            ResultSet rs1 = ps1.executeQuery();
-                                            printPost(rs1);
-                                            count++;
-//                                            System.out.println("PostID:" + rs.getInt("postID"));
-                                            System.out.print("replyID:" + rs.getInt("reply_id"));
-                                            System.out.println();
-                                            System.out.println("reply author:" + rs.getString("author_name"));
-                                            System.out.print("content:" + rs.getString("content"));
-                                            System.out.println();
-                                            System.out.print("number of stars:" + rs.getInt("stars"));
-                                            System.out.println();
-                                            System.out.println("---------------------------------------------------------");
-                                            System.out.println("---------------------------------------------------------");
-                                        }
-                                        if (count == 0) {
-                                            System.out.println("you don't have reply");
-                                        }
-                                        break;
-                                    }
-
-                                    case "follow": {
-                                        sql = "select *\n" +
-                                                "from author_followed\n" +
-                                                "where author_name = ?;";
-                                        PreparedStatement ps = con.prepareStatement(sql);
-                                        ps.setString(1, authorName);
-                                        ResultSet rs = ps.executeQuery();
-                                        if (rs.next()) {
-                                            System.out.println("author_name");
-                                            System.out.println(rs.getString("followed_author_name"));
-                                            while (rs.next()) {
-                                                System.out.println(rs.getString("followed_author_name"));
-                                            }
-                                        } else {
-                                            System.out.println("you don't follow any other authors");
-                                        }
-                                        break;
-                                    }
-
-                                    case "like": {
-                                        sql = "select *\n" +
-                                                "from like_post\n" +
-                                                "where author_name = ?;";
-                                        PreparedStatement ps = con.prepareStatement(sql);
-                                        ps.setString(1, authorName);
-                                        ResultSet rs = ps.executeQuery();
-                                        if (rs.next()) {
-                                            System.out.println("post_id");
-                                            System.out.println(rs.getInt("post_id"));
-                                            while (rs.next()) {
-                                                System.out.println(rs.getInt("post_id"));
-                                            }
-                                        } else {
-                                            System.out.println("you don't like any posts");
-                                        }
-                                        break;
-                                    }
-
-                                    case "favorite": {
-                                        sql = "select *\n" +
-                                                "from author_favorited\n" +
-                                                "where favorited_author_name = ?;";
-                                        PreparedStatement ps = con.prepareStatement(sql);
-                                        ps.setString(1, authorName);
-                                        ResultSet rs = ps.executeQuery();
-                                        if (rs.next()) {
-                                            System.out.println("post_id");
-                                            System.out.println(rs.getInt("post_id"));
-                                            while (rs.next()) {
-                                                System.out.println(rs.getInt("post_id"));
-                                            }
-                                        } else {
-                                            System.out.println("you don't like any posts");
-                                        }
-                                        break;
-                                    }
-
-                                    default: {
-                                        System.out.println("wrong list type");
-                                    }
-
-                                }
-                            } else {
-                                System.out.println("you haven't log in");
-                            }
-                            break;
-                        }
-
-                        case "follow": {
-                            //follow author_name
-                            //判断author是否存在
-                            if (isLogin) {
-                                System.out.print("Please input the author:");
-                                String followed_author = in.nextLine();
-                                if (Objects.equals(followed_author, "quit")) {
-                                    System.out.println("you have quited during this command process");
-                                    continue;
-                                }
+    public static void main(String[] args) throws IOException {
+        try (ServerSocket serverSocket = new ServerSocket(12345)) {
+            clientSocket = serverSocket.accept(); // 假设服务端监听在localhost的12345端口
+            reader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+            writer = new PrintWriter(clientSocket.getOutputStream(), true);
+            Properties prop = loadDBUser();
+            long start = 0;
+            long end = 0;
+            try {
+                String jsonStrings = Files.readString(Path.of("resources/posts.json"));
+                List<Post> posts = JSON.parseArray(jsonStrings, Post.class);
+                String jsonString = Files.readString(Path.of("resources/replies.json"));
+                List<Replies> replies = JSON.parseArray(jsonString, Replies.class);
+                start = System.currentTimeMillis();
+                openDB(prop);
+                setPrepareStatement();
+                boolean isLogin = false;
+                String authorName = "";
+                String authorId = "";
+                String authorPhone = "";
+                String author_registration_time = "";
+                String content = "";
+                int stars;
+                String title = "";
+                while (true) {
+                    String userInput = reader.readLine();
+                    //                    writer.println(userInput);
+                    String serverResponse = "";
+                    String sql = "";
+                    //命令 ：reg author_name password
+                    if (!userInput.equalsIgnoreCase("quit")) {
+                        switch (userInput.toLowerCase(Locale.ROOT)) {
+                            case "register": { //reg author_name
+                                writer.println("Please input your name: ");
+                                writer.flush();
+                                writer.println("quit");
+                                writer.flush();
+                                //判断author是否已被注册
+                                String b = reader.readLine();
                                 sql = "SELECT *\n" +
                                         "from authors\n" +
                                         "where author_name = ?;";
                                 PreparedStatement ps = con.prepareStatement(sql);
-                                ps.setString(1, followed_author);
+                                ps.setString(1, b);
                                 ResultSet rs = ps.executeQuery();
                                 if (rs.next()) {
-                                    stmtFollow.setString(1, authorName);
-                                    stmtFollow.setString(2, followed_author);
-                                    stmtFollow.addBatch();
-                                    System.out.println("follow successfully.");
+                                    writer.println("The name has already been registered");
+                                    writer.flush();
+                                    writer.println("quit");
+                                    writer.flush();
                                 } else {
-                                    System.out.println("this author doesn't exist.");
+                                    writer.println("Input your password: ");
+                                    writer.flush();
+                                    writer.println("quit");
+                                    writer.flush();
+                                    String password = reader.readLine();
+                                    writer.println("confirm your password: ");
+                                    writer.flush();
+                                    writer.println("quit");
+                                    writer.flush();
+                                    if (Objects.equals(password, reader.readLine())) {
+                                        writer.println("Input your phone number: ");
+                                        writer.flush();
+                                        writer.println("quit");
+                                        writer.flush();
+                                        authorPhone = reader.readLine();
+//                                        System.out.println(authorPhone);
+                                        authorName = b;
+                                        authorId = GenerateAuthorId();
+                                        author_registration_time = getCurrentTime();
+                                        insertAuthor(authorId, author_registration_time, authorPhone, authorName, password);
+                                        writer.println("register is finished.Please login in.");
+                                        writer.flush();
+                                        writer.println("quit");
+                                        writer.flush();
+                                    }
                                 }
-                            } else {
-                                System.out.println("not log in");
+                                break;
                             }
-                            break;
-                        }
 
-                        case "login": {
-                            //login author_name
-                            if (!isLogin) {
-                                System.out.print("author:");
-                                authorName = in.nextLine();
-                                sql = "SELECT *\n" +
-                                        "from authors\n" +
-                                        "where author_name = ?;";
-                                PreparedStatement ps = con.prepareStatement(sql);
-                                ps.setString(1, authorName);
-                                ResultSet rs = ps.executeQuery();
-                                if (rs.next()) {
-                                    String password = rs.getString("password");
-                                    System.out.print("Password:");
-                                    if (Objects.equals(in.nextLine(), password)) {
-                                        isLogin = true;
-                                        System.out.println("login in successfully");
+                            case "like": {//like post_id
+                                if (isLogin) {
+                                    //判断此post_id是否存在
+                                    writer.println("The post you like is: ");
+                                    writer.flush();
+                                    writer.println("quit");
+                                    writer.flush();
+                                    int b = Integer.parseInt(reader.readLine());
+                                    sql = "SELECT *\n" +
+                                            "from posts\n" +
+                                            "where id = ?;";
+                                    PreparedStatement ps = con.prepareStatement(sql);
+                                    ps.setInt(1, b);
+                                    ResultSet rs = ps.executeQuery();
+                                    if (rs.next()) {
+                                        stmtLike.setInt(1, b);
+                                        stmtLike.setString(2, authorName);
+                                        stmtLike.addBatch();
+                                        writer.println("you like this post");
+                                        writer.flush();
+                                        writer.println("quit");
+                                        writer.flush();
                                     } else {
-                                        System.out.println("your password is wrong");
-                                        System.out.println(password);
+                                        writer.println("This post doesn't exist");
+                                        writer.flush();
+                                        writer.println("quit");
+                                        writer.flush();
                                     }
                                 } else {
-                                    System.out.println("author isn't existing.Please register first");
+                                    writer.println("You have not logged in yet");
+                                    writer.flush();
+                                    writer.println("quit");
+                                    writer.flush();
                                 }
-                            } else {
-                                System.out.println("you have login.Please log out first");
+                                break;
                             }
-                            break;
-                        }
 
-                        case "undo follow": {
-                            if (isLogin) {
-                                System.out.print("author:");
-                                String unAuthor = in.nextLine();
-                                sql = "SELECT *\n" +
-                                        "from authors\n" +
-                                        "where author_name = ?;";
-                                PreparedStatement ps = con.prepareStatement(sql);
-                                ps.setString(1, unAuthor);
-                                ResultSet rs = ps.executeQuery();
-                                if (rs.next()) {
-                                    String sql2 = "SELECT *\n" +
-                                            "from author_followed\n" +
-                                            "where followed_author_name = ? and author_name = ?;";
-                                    PreparedStatement ps2 = con.prepareStatement(sql2);
-                                    ps2.setString(1, unAuthor);
-                                    ps2.setString(2, authorName);
-                                    ResultSet rs2 = ps2.executeQuery();
-                                    if (rs2.next()) {
-                                        String sql1 = "DELETE\n" +
-                                                "from author_followed\n" +
-                                                "where followed_author_name = ? and author_name = ?;";
-                                        PreparedStatement ps1 = con.prepareStatement(sql1);
-                                        ps1.setString(1, unAuthor);
-                                        ps1.setString(2, authorName);
-                                        int isUndo = ps1.executeUpdate();
-                                        if (isUndo > 0) {
-                                            System.out.println("You successfully unfollowed this author");
+                            case "favorite": {//favorite post_id
+                                if (isLogin) {
+                                    //判断此post_id是否存在
+                                    writer.println("The post you favorite is: ");
+                                    writer.flush();
+                                    writer.println("quit");
+                                    writer.flush();
+                                    int b = Integer.parseInt(reader.readLine());
+                                    sql = "SELECT *\n" +
+                                            "from posts\n" +
+                                            "where id = ?;";
+                                    PreparedStatement ps = con.prepareStatement(sql);
+                                    ps.setInt(1, b);
+                                    ResultSet rs = ps.executeQuery();
+                                    if (rs.next()) {
+                                        stmtFavr.setInt(1, b);
+                                        stmtFavr.setString(2, authorName);
+                                        stmtFavr.addBatch();
+                                        writer.println("you favorite this post.");
+                                        writer.flush();
+                                        writer.println("quit");
+                                        writer.flush();
+                                    } else {
+                                        writer.println("This post doesn't exist.");
+                                        writer.flush();
+                                        writer.println("quit");
+                                        writer.flush();
+                                    }
+                                } else {
+                                    writer.println("You have not logged in yet");
+                                    writer.flush();
+                                    writer.println("quit");
+                                    writer.flush();
+                                }
+                                break;
+                            }
+
+                            case "share": {//share post_id
+                                if (isLogin) {
+                                    //判断此post_id是否存在
+                                    writer.println("The post you share is: ");
+                                    writer.flush();
+                                    writer.println("quit");
+                                    writer.flush();
+                                    int b = Integer.parseInt(reader.readLine());
+                                    sql = "SELECT *\n" +
+                                            "from posts\n" +
+                                            "where id = ?;";
+                                    PreparedStatement ps = con.prepareStatement(sql);
+                                    ps.setInt(1, b);
+                                    ResultSet rs = ps.executeQuery();
+                                    if (rs.next()) {
+                                        stmtShare.setInt(1, b);
+                                        stmtShare.setString(2, authorName);
+                                        stmtShare.addBatch();
+                                        writer.println("you have share this post");
+                                        writer.flush();
+                                        writer.println("quit");
+                                        writer.flush();
+                                    } else {
+                                        writer.println("This post doesn't exist");
+                                        writer.flush();
+                                        writer.println("quit");
+                                        writer.flush();
+                                    }
+                                } else {
+                                    writer.println("You have not logged in yet");
+                                    writer.flush();
+                                    writer.println("quit");
+                                    writer.flush();
+                                }
+                                break;
+                            }
+
+                            case "reply": {//reply post_id content
+                                if (isLogin) {
+                                    writer.println("The post you reply is: ");
+                                    writer.flush();
+                                    writer.println("quit");
+                                    writer.flush();
+                                    int b = Integer.parseInt(reader.readLine());
+//                                    reader.readLine();
+                                    sql = "SELECT *\n" +
+                                            "from posts\n" +
+                                            "where id = ?;";
+                                    PreparedStatement ps = con.prepareStatement(sql);
+                                    ps.setInt(1, b);
+                                    ResultSet rs = ps.executeQuery();
+                                    if (rs.next()) {
+                                        String s = "SELECT * FROM replies ORDER BY reply_id DESC LIMIT 1";
+                                        PreparedStatement p = con.prepareStatement(s);
+                                        ResultSet r = p.executeQuery();
+                                        if (r.next()) {
+                                            stmtReply.setInt(1, r.getInt("reply_id") + 1);
+                                            writer.println("content: ");
+                                            writer.flush();
+                                            writer.println("quit");
+                                            writer.flush();
+                                            content = reader.readLine();
+                                            stmtReply.setInt(2, b);
+                                            stmtReply.setString(3, content);
+                                            stmtReply.setInt(4, 0);
+                                            stmtReply.setString(5, authorName);
+                                            stmtReply.addBatch();
+                                            writer.println("reply successfully");
+                                            writer.flush();
+                                            writer.println("quit");
+                                            writer.flush();
                                         } else {
-                                            System.out.println("something wrong");
+                                            writer.println("nothing");
+                                            writer.flush();
+                                            writer.println("quit");
+                                            writer.flush();
                                         }
                                     } else {
-                                        System.out.println("You haven't followed the author");
+                                        writer.println("This post doesn't exist");
+                                        writer.flush();
+                                        writer.println("quit");
+                                        writer.flush();
                                     }
                                 } else {
-                                    System.out.println("author isn't existing.");
+                                    writer.println("You have not logged in yet");
+                                    writer.flush();
+                                    writer.println("quit");
+                                    writer.flush();
                                 }
-                            } else {
-                                System.out.println("You have not logged in yet");
+                                break;
                             }
-                            break;
-                        }
 
-                        case "block": {
-                            System.out.print("which author do you want to block");//还需要把前面的命令改了
-                            String bcked = in.nextLine();
-                            sql = "INSERT INTO public.blocklist(author_name, blocked_name) VALUES (?,?) ON CONFLICT (author_name,blocked_name) DO NOTHING ;";
-                            PreparedStatement ps = con.prepareStatement(sql);
-                            ps.setString(1, authorName);
-                            ps.setString(2, bcked);
-                            ps.executeQuery();
-                            break;
-                        }
-
-                        case "help": {
-                            System.out.println("command: ");
-                            System.out.println("--register: register an author");
-                            System.out.println("--login: login ");
-                            System.out.println("--post: post something you want to post");
-                            System.out.println("--like: like a post");
-                            System.out.println("--favorite: favorite a post");
-                            System.out.println("--share: share a post");
-                            System.out.println("--reply: reply a post");
-                            System.out.println("--second reply: reply a reply");
-                            System.out.println("--list: check some lists about yourself");
-                            System.out.println("--follow: follow an author");
-                            break;
-                        }
-
-                        case "anonymous": {
-                            if (isLogin) {
-                                System.out.print("Please enter the type you want to talk (post/reply/secondreply): ");
-                                String type = in.nextLine();
-                                switch (type.toLowerCase(Locale.ROOT)) {
-
-                                    case "post": {
-                                        String sql1 = "SELECT * FROM posts ORDER BY ID DESC LIMIT 1";
+                            case "secondreply": {//reply reply_id content
+                                if (isLogin) {
+                                    writer.println("The reply you want to reply is: ");
+                                    writer.flush();
+                                    writer.println("quit");
+                                    writer.flush();
+                                    int b = Integer.parseInt(reader.readLine());
+//                                    reader.readLine();
+                                    sql = "SELECT *\n" +
+                                            "from replies\n" +
+                                            "where reply_id = ?;";
+                                    PreparedStatement ps = con.prepareStatement(sql);
+                                    ps.setInt(1, b);
+                                    ResultSet rs = ps.executeQuery();
+                                    if (rs.next()) {
+                                        String sql1 = "SELECT * FROM second_replies ORDER BY id DESC LIMIT 1";
                                         PreparedStatement ps1 = con.prepareStatement(sql1);
                                         ResultSet rs1 = ps1.executeQuery();
                                         if (rs1.next()) {
-                                            int id = rs1.getInt("ID") + 1;
-                                            stmtPost.setInt(1, id);
-                                            System.out.print("Your post's title is: ");
-                                            title = in.nextLine();
-                                            stmtPost.setString(2, title);
-                                            System.out.print("content: ");
-                                            content = in.nextLine();
-                                            stmtPost.setString(3, content);
-                                            stmtPost.setTimestamp(4, Timestamp.valueOf(getCurrentTime()));
-                                            stmtPost.setString(5, "anonymous");
-                                            stmtPost.setString(6, "anonymous");
-                                            stmtPost.addBatch();
-                                            System.out.println("post successfully");
+                                            stmtSecondReply.setInt(1, rs1.getInt("id") + 1);
+                                            stmtSecondReply.setInt(2, 0);
+                                            writer.println("content: ");
+                                            writer.flush();
+                                            writer.println("quit");
+                                            writer.flush();
+                                            content = reader.readLine();
+                                            stmtSecondReply.setString(3, authorName);
+                                            stmtSecondReply.setString(4, content);
+                                            stmtSecondReply.addBatch();
+                                            stmtReToSecRe.setInt(1, b);
+                                            stmtReToSecRe.setInt(2, rs1.getInt("id") + 1);
+                                            stmtReToSecRe.addBatch();
                                         } else {
-                                            stmtPost.setInt(1, 1);
-                                            System.out.print("Your post's title is: ");
-                                            title = in.nextLine();
-                                            stmtPost.setString(2, title);
-                                            System.out.print("content: ");
-                                            content = in.nextLine();
-                                            stmtPost.setString(3, content);
-                                            stmtPost.setTimestamp(4, Timestamp.valueOf(getCurrentTime()));
-                                            stmtPost.setString(5, "anonymous");
-                                            stmtPost.setString(6, "anonymous");
-                                            stmtPost.addBatch();
-                                            System.out.println("post successfully");
+                                            writer.println("con not find");
+                                            writer.flush();
+                                            writer.println("quit");
+                                            writer.flush();
                                         }
-                                        break;
+                                        writer.println("reply successfully");
+                                        writer.flush();
+                                        writer.println("quit");
+                                        writer.flush();
+                                    } else {
+                                        writer.println("This reply doesn't exist");
+                                        writer.flush();
+                                        writer.println("quit");
+                                        writer.flush();
                                     }
+                                } else {
+                                    writer.println("You have not logged in yet");
+                                    writer.flush();
+                                    writer.println("quit");
+                                    writer.flush();
+                                }
+                                break;
+                            }
 
-                                    case "reply": {
-                                        System.out.print("The post you reply is: ");
-                                        int b = in.nextInt();
-                                        in.nextLine();
-                                        sql = "SELECT *\n" +
-                                                "from posts\n" +
-                                                "where id = ?;";
-                                        PreparedStatement ps = con.prepareStatement(sql);
-                                        ps.setInt(1, b);
-                                        ResultSet rs = ps.executeQuery();
-                                        if (rs.next()) {
-                                            String s = "SELECT * FROM replies ORDER BY reply_id DESC LIMIT 1";
-                                            PreparedStatement p = con.prepareStatement(s);
-                                            ResultSet r = p.executeQuery();
-                                            if (r.next()) {
-                                                stmtReply.setInt(1, r.getInt("reply_id") + 1);
-                                                System.out.print("content: ");
-                                                content = in.nextLine();
-                                                stmtReply.setInt(2, b);
-                                                stmtReply.setString(3, content);
-                                                stmtReply.setInt(4, 0);
-                                                stmtReply.setString(5, "anonymous");
-                                                stmtReply.addBatch();
-                                                System.out.println("reply successfully");
+                            case "post": {//post content
+                                if (isLogin) {
+                                    String sql1 = "SELECT * FROM posts ORDER BY ID DESC LIMIT 1";
+                                    PreparedStatement ps1 = con.prepareStatement(sql1);
+                                    ResultSet rs1 = ps1.executeQuery();
+                                    if (rs1.next()) {
+                                        int id = rs1.getInt("ID") + 1;
+                                        stmtPost.setInt(1, id);
+                                        writer.println("Your post's title is: ");
+                                        writer.flush();
+                                        writer.println("quit");
+                                        writer.flush();
+                                        title = reader.readLine();
+                                        stmtPost.setString(2, title);
+                                        writer.println("content: ");
+                                        writer.flush();
+                                        writer.println("quit");
+                                        writer.flush();
+                                        content = reader.readLine();
+                                        stmtPost.setString(3, content);
+                                        stmtPost.setTimestamp(4, Timestamp.valueOf(getCurrentTime()));
+                                        stmtPost.setString(5, "Shenzhen");
+                                        stmtPost.setString(6, authorName);
+                                        stmtPost.addBatch();
+                                        writer.println("post successfully");
+                                        writer.println("quit");
+                                        writer.flush();
+                                        writer.flush();
+                                        String category = reader.readLine();
+                                        stmtCate.setInt(1, id);
+                                        stmtCate.setString(2, category);
+                                    } else {
+                                        stmtPost.setInt(1, 1);
+                                        writer.println("Your post's title is: ");
+                                        writer.flush();
+                                        writer.println("quit");
+                                        writer.flush();
+                                        title = reader.readLine();
+                                        stmtPost.setString(2, title);
+                                        writer.println("content: ");
+                                        writer.flush();
+                                        writer.println("quit");
+                                        writer.flush();
+                                        content = reader.readLine();
+                                        stmtPost.setString(3, content);
+                                        stmtPost.setTimestamp(4, Timestamp.valueOf(getCurrentTime()));
+                                        stmtPost.setString(5, "Shenzhen");
+                                        stmtPost.setString(6, authorName);
+                                        stmtPost.addBatch();
+                                        writer.println("post successfully");
+                                        writer.flush();
+                                        writer.println("quit");
+                                        writer.flush();
+                                        String category = reader.readLine();
+                                        stmtCate.setInt(1, 1);
+                                        stmtCate.setString(2, category);
+                                    }
+                                } else {
+                                    writer.println("You have not logged in yet");
+                                    writer.flush();
+                                    writer.println("quit");
+                                    writer.flush();
+                                }
+                                break;
+                            }
+
+                            case "list": {
+                                //checklist follow or like or.....
+                                if (isLogin) {
+                                    writer.println("Please input what list you want to search(follow/like/favorite/post/replied post/share):");
+                                    writer.flush();
+                                    writer.println("quit");
+                                    writer.flush();
+                                    String type = reader.readLine();
+                                    switch (type.toLowerCase(Locale.ROOT)) {
+
+                                        case "share": {
+                                            sql = "select *\n" +
+                                                    "from share_author\n" +
+                                                    "where shared_author_name = ?;";
+                                            PreparedStatement ps = con.prepareStatement(sql);
+                                            ps.setString(1, authorName);
+                                            ResultSet rs = ps.executeQuery();
+                                            if (rs.next()) {
+                                                writer.println("post_id");
+                                                writer.flush();
+                                                writer.println(rs.getInt("post_id"));
+                                                writer.flush();
+                                                while (rs.next()) {
+                                                    writer.println(rs.getInt("post_id"));
+                                                    writer.flush();
+                                                }
                                             } else {
-                                                System.out.print("nothing");
+                                                writer.println("you don't share any posts");
+                                                writer.flush();
+                                                writer.println("quit");
+                                                writer.flush();
+                                            }
+                                            writer.println("quit");
+                                            writer.flush();
+                                            break;
+                                        }
+
+                                        case "post": {
+                                            sql = "SELECT * FROM posts where author_name = ?;";
+                                            PreparedStatement ps = con.prepareStatement(sql);
+                                            ps.setString(1, authorName);
+                                            ResultSet rs = ps.executeQuery();
+
+                                            printPost(rs);
+                                            break;
+                                        }
+
+                                        case "reply": {
+                                            sql = "select *\n" +
+                                                    "from replies\n" +
+                                                    "where reply_id in (\n" +
+                                                    "    select reply_id\n" +
+                                                    "    from replies_to_second_replies\n" +
+                                                    "    where second_reply_id in (select id from second_replies where author_name = ?))";
+                                            PreparedStatement ps = con.prepareStatement(sql);
+                                            ps.setString(1, authorName);
+                                            ResultSet rs = ps.executeQuery();
+                                            int count = 0;
+                                            while (rs.next()) {
+                                                count++;
+                                                writer.println("replyID:" + rs.getInt("reply_id"));
+                                                writer.flush();
+                                                writer.println("reply author:" + rs.getString("author_name"));
+                                                writer.flush();
+                                                writer.println("content:" + rs.getString("content"));
+                                                writer.flush();
+                                                writer.println("number of stars: " + rs.getInt("stars"));
+                                                writer.flush();
+                                                writer.println("---------------------------------------------------------");
+                                                writer.flush();
+                                            }
+                                            writer.println("quit");
+                                            writer.flush();
+                                            if (count == 0) {
+                                                writer.println("you dont reply any reply");
+                                                writer.flush();
+                                                writer.println("quit");
+                                                writer.flush();
+                                            }
+                                            break;
+                                        }
+
+                                        case "replied post": {
+                                            sql = "SELECT * from replies where author_name= ?;";
+                                            PreparedStatement ps = con.prepareStatement(sql);
+                                            ps.setString(1, authorName);
+                                            ResultSet rs = ps.executeQuery();
+                                            int count = 0;
+                                            while (rs.next()) {
+                                                String sql1 = "SELECT * FROM posts where id = ?;";
+                                                PreparedStatement ps1 = con.prepareStatement(sql1);
+                                                ps1.setInt(1, rs.getInt("postID"));
+                                                ResultSet rs1 = ps1.executeQuery();
+                                                printPost1(rs1);
+                                                count++;
+                                            }
+                                            writer.println("quit");
+                                            writer.flush();
+                                            if (count == 0) {
+                                                writer.println("you don't have reply");
+                                                writer.flush();
+                                                writer.println("quit");
+                                                writer.flush();
+                                            }
+                                            break;
+                                        }
+
+                                        case "follow": {
+                                            sql = "select *\n" +
+                                                    "from author_followed\n" +
+                                                    "where author_name = ?;";
+                                            PreparedStatement ps = con.prepareStatement(sql);
+                                            ps.setString(1, authorName);
+                                            ResultSet rs = ps.executeQuery();
+                                            if (rs.next()) {
+                                                writer.println("author_name");
+                                                writer.flush();
+                                                writer.println(rs.getString("followed_author_name"));
+                                                writer.flush();
+                                                while (rs.next()) {
+                                                    writer.println(rs.getString("followed_author_name"));
+                                                    writer.flush();
+                                                }
+                                            } else {
+                                                writer.println("you don't follow any other authors");
+                                                writer.flush();
+                                                writer.println("quit");
+                                                writer.flush();
+                                            }
+                                            writer.println("quit");
+                                            writer.flush();
+                                            break;
+                                        }
+
+                                        case "like": {
+                                            sql = "select *\n" +
+                                                    "from like_post\n" +
+                                                    "where author_name = ?;";
+                                            PreparedStatement ps = con.prepareStatement(sql);
+                                            ps.setString(1, authorName);
+                                            ResultSet rs = ps.executeQuery();
+                                            if (rs.next()) {
+                                                writer.println("post_id");
+                                                writer.flush();
+                                                writer.println(rs.getInt("post_id"));
+                                                writer.flush();
+                                                while (rs.next()) {
+                                                    writer.println(rs.getInt("post_id"));
+                                                    writer.flush();
+                                                }
+                                            } else {
+                                                writer.println("you don't like any posts");
+                                                writer.flush();
+                                                writer.println("quit");
+                                                writer.flush();
+                                            }
+                                            writer.println("quit");
+                                            writer.flush();
+                                            break;
+                                        }
+
+                                        case "favorite": {
+                                            sql = "select *\n" +
+                                                    "from author_favorited\n" +
+                                                    "where favorited_author_name = ?;";
+                                            PreparedStatement ps = con.prepareStatement(sql);
+                                            ps.setString(1, authorName);
+                                            ResultSet rs = ps.executeQuery();
+                                            if (rs.next()) {
+                                                writer.println("post_id");
+                                                writer.flush();
+                                                writer.println(rs.getInt("post_id"));
+                                                writer.flush();
+                                                while (rs.next()) {
+                                                    writer.println(rs.getInt("post_id"));
+                                                    writer.flush();
+                                                }
+                                            } else {
+                                                writer.println("you don't favorite any posts");
+                                                writer.flush();
+                                                writer.println("quit");
+                                                writer.flush();
+                                            }
+                                            writer.println("quit");
+                                            writer.flush();
+                                            break;
+                                        }
+
+                                        default: {
+                                            writer.println("wrong list type");
+                                            writer.flush();
+                                            writer.println("quit");
+                                            writer.flush();
+                                        }
+
+                                    }
+                                } else {
+                                    writer.println("you haven't log in");
+                                    writer.flush();
+                                    writer.println("quit");
+                                    writer.flush();
+                                }
+                                break;
+                            }
+
+                            case "follow": {
+                                //follow author_name
+                                //判断author是否存在
+                                if (isLogin) {
+                                    writer.println("Please input the author:");
+                                    writer.flush();
+                                    writer.println("quit");
+                                    writer.flush();
+                                    String followed_author = reader.readLine();
+                                    if (Objects.equals(followed_author, "quit")) {
+                                        writer.println("you have quited during this command process");
+                                        writer.flush();
+                                        writer.println("quit");
+                                        writer.flush();
+                                        continue;
+                                    }
+                                    sql = "SELECT *\n" +
+                                            "from authors\n" +
+                                            "where author_name = ?;";
+                                    PreparedStatement ps = con.prepareStatement(sql);
+                                    ps.setString(1, followed_author);
+                                    ResultSet rs = ps.executeQuery();
+                                    if (rs.next()) {
+                                        stmtFollow.setString(1, authorName);
+                                        stmtFollow.setString(2, followed_author);
+                                        stmtFollow.addBatch();
+                                        writer.println("follow successfully.");
+                                        writer.flush();
+                                        writer.println("quit");
+                                        writer.flush();
+                                    } else {
+                                        writer.println("this author doesn't exist.");
+                                        writer.flush();
+                                        writer.println("quit");
+                                        writer.flush();
+                                    }
+                                } else {
+                                    writer.println("not log in");
+                                    writer.flush();
+                                    writer.println("quit");
+                                    writer.flush();
+                                }
+                                break;
+                            }
+
+                            case "login": {
+                                //login author_name
+                                if (!isLogin) {
+                                    writer.println("author:");
+                                    writer.flush();
+                                    writer.println("quit");
+                                    writer.flush();
+                                    authorName = reader.readLine();
+                                    sql = "SELECT *\n" +
+                                            "from authors\n" +
+                                            "where author_name = ?;";
+                                    PreparedStatement ps = con.prepareStatement(sql);
+                                    ps.setString(1, authorName);
+                                    ResultSet rs = ps.executeQuery();
+                                    if (rs.next()) {
+                                        String password = rs.getString("password");
+                                        writer.println("Password:");
+                                        writer.flush();
+                                        writer.println("quit");
+                                        writer.flush();
+                                        if (Objects.equals(reader.readLine(), password)) {
+                                            isLogin = true;
+                                            writer.println("login in successfully");
+                                            writer.flush();
+                                            writer.println("quit");
+                                            writer.flush();
+                                        } else {
+                                            writer.println("your password is wrong");
+                                            writer.flush();
+                                            writer.println("quit");
+                                            writer.flush();
+                                        }
+                                    } else {
+                                        writer.println("author isn't existing.Please register first");
+                                        writer.flush();
+                                        writer.println("quit");
+                                        writer.flush();
+                                    }
+                                } else {
+                                    writer.println("you have login.Please log out first");
+                                    writer.flush();
+                                    writer.println("quit");
+                                    writer.flush();
+                                }
+                                break;
+                            }
+
+                            case "undo follow": {
+                                if (isLogin) {
+                                    writer.println("author:");
+                                    writer.flush();
+                                    writer.println("quit");
+                                    writer.flush();
+                                    String unAuthor = reader.readLine();
+                                    sql = "SELECT *\n" +
+                                            "from authors\n" +
+                                            "where author_name = ?;";
+                                    PreparedStatement ps = con.prepareStatement(sql);
+                                    ps.setString(1, unAuthor);
+                                    ResultSet rs = ps.executeQuery();
+                                    if (rs.next()) {
+                                        String sql2 = "SELECT *\n" +
+                                                "from author_followed\n" +
+                                                "where followed_author_name = ? and author_name = ?;";
+                                        PreparedStatement ps2 = con.prepareStatement(sql2);
+                                        ps2.setString(1, unAuthor);
+                                        ps2.setString(2, authorName);
+                                        ResultSet rs2 = ps2.executeQuery();
+                                        if (rs2.next()) {
+                                            String sql1 = "DELETE\n" +
+                                                    "from author_followed\n" +
+                                                    "where followed_author_name = ? and author_name = ?;";
+                                            PreparedStatement ps1 = con.prepareStatement(sql1);
+                                            ps1.setString(1, unAuthor);
+                                            ps1.setString(2, authorName);
+                                            int isUndo = ps1.executeUpdate();
+                                            if (isUndo > 0) {
+                                                writer.println("You successfully unfollowed this author");
+                                                writer.flush();
+                                                writer.println("quit");
+                                                writer.flush();
+                                            } else {
+                                                writer.println("something wrong");
+                                                writer.flush();
+                                                writer.println("quit");
+                                                writer.flush();
                                             }
                                         } else {
-                                            System.out.print("This post doesn't exist");
+                                            writer.println("You haven't followed the author");
+                                            writer.flush();
+                                            writer.println("quit");
+                                            writer.flush();
                                         }
-                                        break;
+                                    } else {
+                                        writer.println("author isn't existing.");
+                                        writer.flush();
+                                        writer.println("quit");
+                                        writer.flush();
+                                    }
+                                } else {
+                                    writer.println("You have not logged in yet");
+                                    writer.flush();
+                                    writer.println("quit");
+                                    writer.flush();
+                                }
+                                break;
+                            }
+
+                            case "search": {
+                                if (isLogin) {
+                                    writer.println("Enter year and month (YYYY-MM): ");
+                                    writer.flush();
+                                    writer.println("quit");
+                                    writer.flush();
+                                    String yearMonthInput = reader.readLine();
+                                    writer.println("Enter ending year and month (YYYY-MM): ");
+                                    writer.flush();
+                                    writer.println("quit");
+                                    writer.flush();
+                                    String endYearMonthInput = reader.readLine();
+                                    writer.println("Enter category: ");
+                                    writer.flush();writer.println("quit");
+                                    writer.flush();
+                                    String category = reader.readLine();
+                                    writer.println("Enter key: ");
+                                    writer.flush();
+                                    writer.println("quit");
+                                    writer.flush();
+                                    String key = reader.readLine();
+
+                                    sql = "SELECT distinct p.* FROM posts p " +
+                                            "JOIN category_post cp ON p.id = cp.post_id " +
+                                            "WHERE 1=1";
+                                    if (!yearMonthInput.equalsIgnoreCase("all") && !endYearMonthInput.equalsIgnoreCase("all")) {
+                                        sql += " AND p.posting_time >= ? AND p.posting_time <= ?";
+                                    }
+                                    if (!category.isEmpty() && !category.equalsIgnoreCase("all")) {
+                                        sql += " AND cp.category = ?";
+                                    }
+                                    if (!key.isEmpty() && !key.equalsIgnoreCase("all")) {
+                                        sql += " AND (p.title LIKE ? OR p.content LIKE ?)";
                                     }
 
-                                    case "secondreply": {
-                                        System.out.print("The reply you want to reply is: ");
-                                        int b = in.nextInt();
-                                        in.nextLine();
-                                        sql = "SELECT *\n" +
-                                                "from replies\n" +
-                                                "where reply_id = ?;";
-                                        PreparedStatement ps = con.prepareStatement(sql);
-                                        ps.setInt(1, b);
-                                        ResultSet rs = ps.executeQuery();
-                                        if (rs.next()) {
-                                            String sql1 = "SELECT * FROM second_replies ORDER BY id DESC LIMIT 1";
+                                    PreparedStatement ps = con.prepareStatement(sql, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
+                                    int paramIndex = 1;
+                                    if (!yearMonthInput.equalsIgnoreCase("all") && !endYearMonthInput.equalsIgnoreCase("all")) {
+                                        String startDateTime = yearMonthInput + "-01 00:00:00";
+                                        String endDateTime = endYearMonthInput + "-31 23:59:59";
+                                        ps.setTimestamp(paramIndex++, Timestamp.valueOf(startDateTime));
+                                        ps.setTimestamp(paramIndex++, Timestamp.valueOf(endDateTime));
+                                    }
+                                    if (!category.isEmpty() && !category.equalsIgnoreCase("all")) {
+                                        ps.setString(paramIndex++, category);
+                                    }
+                                    if (!key.isEmpty() && !key.equalsIgnoreCase("all")) {
+                                        ps.setString(paramIndex++, "%" + key + "%");
+                                        ps.setString(paramIndex++, "%" + key + "%");
+                                    }
+
+                                    ResultSet rs = ps.executeQuery();
+                                    printPost(rs);
+                                    rs.beforeFirst();
+                                    while (rs.next()) {
+                                        stmtSearch.setInt(1, rs.getInt("id"));
+                                        stmtSearch.setString(2, authorName);
+                                        stmtSearch.addBatch();
+                                    }
+                                } else {
+                                    writer.println("You have not logged in yet");
+                                    writer.flush();
+                                    writer.println("quit");
+                                    writer.flush();
+                                }
+                                break;
+                            }
+
+                            case "block": {
+                                System.out.print("which author do you want to block");//还需要把前面的命令改了
+                                String bcked = reader.readLine();
+                                sql = "INSERT INTO public.blocklist(author_name, blocked_name) VALUES (?,?) ON CONFLICT (author_name,blocked_name) DO NOTHING ;";
+                                PreparedStatement ps = con.prepareStatement(sql);
+                                ps.setString(1, authorName);
+                                ps.setString(2, bcked);
+                                ps.executeQuery();
+                                break;
+                            }
+
+                            case "help": {
+                                writer.println("command: ");
+                                writer.flush();
+                                writer.println("--register: register an author");
+                                writer.flush();
+                                writer.println("--login: login ");
+                                writer.flush();
+                                writer.println("--post: post something you want to post");
+                                writer.flush();
+                                writer.println("--like: like a post");
+                                writer.flush();
+                                writer.println("--favorite: favorite a post");
+                                writer.flush();
+                                writer.println("--share: share a post");
+                                writer.flush();
+                                writer.println("--reply: reply a post");
+                                writer.flush();
+                                writer.println("--second reply: reply a reply");
+                                writer.flush();
+                                writer.println("--list: check some lists about yourself");
+                                writer.flush();
+                                writer.println("--follow: follow an author");
+                                writer.flush();
+                                writer.println("quit");
+                                writer.flush();
+                                break;
+                            }
+
+                            case "anonymous": {
+                                if (isLogin) {
+                                    writer.println("Please enter the type you want to talk (post/reply/secondreply): ");
+                                    writer.flush();
+                                    writer.println("quit");
+                                    writer.flush();
+                                    String type = reader.readLine();
+                                    switch (type.toLowerCase(Locale.ROOT)) {
+
+                                        case "post": {
+                                            String sql1 = "SELECT * FROM posts ORDER BY ID DESC LIMIT 1";
                                             PreparedStatement ps1 = con.prepareStatement(sql1);
                                             ResultSet rs1 = ps1.executeQuery();
                                             if (rs1.next()) {
-                                                stmtSecondReply.setInt(1, rs1.getInt("id") + 1);
-                                                stmtSecondReply.setInt(2, 0);
-                                                System.out.print("content: ");
-                                                content = in.nextLine();
-                                                stmtSecondReply.setString(3, "anonymous");
-                                                stmtSecondReply.setString(4, content);
-                                                stmtSecondReply.addBatch();
-                                                stmtReToSecRe.setInt(1, b);
-                                                stmtReToSecRe.setInt(2, rs1.getInt("id") + 1);
-                                                stmtReToSecRe.addBatch();
+                                                int id = rs1.getInt("ID") + 1;
+                                                stmtPost.setInt(1, id);
+                                                writer.println("Your post's title is: ");
+                                                writer.flush();
+                                                writer.println("quit");
+                                                writer.flush();
+                                                title = reader.readLine();
+                                                stmtPost.setString(2, title);
+                                                writer.println("content: ");
+                                                writer.flush();
+                                                writer.println("quit");
+                                                writer.flush();
+                                                content = reader.readLine();
+                                                stmtPost.setString(3, content);
+                                                stmtPost.setTimestamp(4, Timestamp.valueOf(getCurrentTime()));
+                                                stmtPost.setString(5, "anonymous");
+                                                stmtPost.setString(6, "anonymous");
+                                                stmtPost.addBatch();
+                                                writer.println("post successfully");
+                                                writer.flush();
+                                                writer.println("quit");
+                                                writer.flush();
                                             } else {
-                                                System.out.print("con not find");
+                                                stmtPost.setInt(1, 1);
+                                                writer.println("Your post's title is: ");
+                                                writer.flush();
+                                                writer.println("quit");
+                                                writer.flush();
+                                                title = reader.readLine();
+                                                stmtPost.setString(2, title);
+                                                writer.println("content: ");
+                                                writer.flush();
+                                                writer.println("quit");
+                                                writer.flush();
+                                                content = reader.readLine();
+                                                stmtPost.setString(3, content);
+                                                stmtPost.setTimestamp(4, Timestamp.valueOf(getCurrentTime()));
+                                                stmtPost.setString(5, "anonymous");
+                                                stmtPost.setString(6, "anonymous");
+                                                stmtPost.addBatch();
+                                                writer.println("post successfully");
+                                                writer.flush();
+                                                writer.println("quit");
+                                                writer.flush();
                                             }
-                                            System.out.print("reply successfully");
-                                        } else {
-                                            System.out.print("This reply doesn't exist");
+                                            break;
+                                        }
+
+                                        case "reply": {
+                                            writer.println("The post you reply is: ");
+                                            writer.flush();
+                                            writer.println("quit");
+                                            writer.flush();
+                                            int b = Integer.parseInt(reader.readLine());
+//                                            reader.readLine();
+                                            sql = "SELECT *\n" +
+                                                    "from posts\n" +
+                                                    "where id = ?;";
+                                            PreparedStatement ps = con.prepareStatement(sql);
+                                            ps.setInt(1, b);
+                                            ResultSet rs = ps.executeQuery();
+                                            if (rs.next()) {
+                                                String s = "SELECT * FROM replies ORDER BY reply_id DESC LIMIT 1";
+                                                PreparedStatement p = con.prepareStatement(s);
+                                                ResultSet r = p.executeQuery();
+                                                if (r.next()) {
+                                                    stmtReply.setInt(1, r.getInt("reply_id") + 1);
+                                                    writer.println("content: ");
+                                                    writer.flush();
+                                                    writer.println("quit");
+                                                    writer.flush();
+                                                    content = reader.readLine();
+                                                    stmtReply.setInt(2, b);
+                                                    stmtReply.setString(3, content);
+                                                    stmtReply.setInt(4, 0);
+                                                    stmtReply.setString(5, "anonymous");
+                                                    stmtReply.addBatch();
+                                                    writer.println("reply successfully");
+                                                    writer.flush();
+                                                    writer.println("quit");
+                                                    writer.flush();
+                                                } else {
+                                                    writer.println("nothing");
+                                                    writer.flush();
+                                                    writer.println("quit");
+                                                    writer.flush();
+                                                }
+                                            } else {
+                                                writer.println("This post doesn't exist");
+                                                writer.flush();
+                                                writer.println("quit");
+                                                writer.flush();
+                                            }
+                                            break;
+                                        }
+
+                                        case "secondreply": {
+                                            writer.println("The reply you want to reply is: ");
+                                            writer.flush();
+                                            writer.println("quit");
+                                            writer.flush();
+                                            int b = Integer.parseInt(reader.readLine());
+//                                            reader.readLine();
+                                            sql = "SELECT *\n" +
+                                                    "from replies\n" +
+                                                    "where reply_id = ?;";
+                                            PreparedStatement ps = con.prepareStatement(sql);
+                                            ps.setInt(1, b);
+                                            ResultSet rs = ps.executeQuery();
+                                            if (rs.next()) {
+                                                String sql1 = "SELECT * FROM second_replies ORDER BY id DESC LIMIT 1";
+                                                PreparedStatement ps1 = con.prepareStatement(sql1);
+                                                ResultSet rs1 = ps1.executeQuery();
+                                                if (rs1.next()) {
+                                                    stmtSecondReply.setInt(1, rs1.getInt("id") + 1);
+                                                    stmtSecondReply.setInt(2, 0);
+                                                    writer.println("content: ");
+                                                    writer.flush();
+                                                    writer.println("quit");
+                                                    writer.flush();
+                                                    content = reader.readLine();
+                                                    stmtSecondReply.setString(3, "anonymous");
+                                                    stmtSecondReply.setString(4, content);
+                                                    stmtSecondReply.addBatch();
+                                                    stmtReToSecRe.setInt(1, b);
+                                                    stmtReToSecRe.setInt(2, rs1.getInt("id") + 1);
+                                                    stmtReToSecRe.addBatch();
+                                                } else {
+                                                    writer.println("con not find");
+                                                    writer.flush();
+                                                    writer.println("quit");
+                                                    writer.flush();
+                                                }
+                                                writer.println("reply successfully");
+                                                writer.flush();
+                                                writer.println("quit");
+                                                writer.flush();
+                                            } else {
+                                                writer.println("This reply doesn't exist");
+                                                writer.flush();
+                                                writer.println("quit");
+                                                writer.flush();
+                                            }
                                         }
                                     }
+                                } else {
+                                    writer.println("You have not logged in yet");
+                                    writer.flush();
+                                    writer.println("quit");
+                                    writer.flush();
                                 }
-                            } else {
-                                System.out.print("You have not logged in yet");
+                                break;
                             }
-                            break;
-                        }
 
-                        case "hot": {
-                            sql = "SELECT post_id, COUNT(post_id) AS times\n" +
-                                    "FROM search_record\n" +
-                                    "GROUP BY post_id\n" +
-                                    "ORDER BY times DESC\n" +
-                                    "LIMIT 10;";
-                            PreparedStatement ps = con.prepareStatement(sql);
-                            ResultSet rs = ps.executeQuery();
-                            while (rs.next()) {
-                                int postId = rs.getInt("post_id");
-                                int times = rs.getInt("times");
-                                System.out.println("Post ID: " + postId + ", Times: " + times);
-                            }
-                            break;
-                        }
-
-                        case "search": {
-                            if (isLogin) {
-                                System.out.print("Enter year and month (YYYY-MM): ");
-                                String yearMonthInput = in.nextLine();
-                                System.out.print("Enter ending year and month (YYYY-MM): ");
-                                String endYearMonthInput = in.nextLine();
-                                System.out.print("Enter category: ");
-                                String category = in.nextLine();
-                                System.out.print("Enter key: ");
-                                String key = in.nextLine();
-
-                                sql = "SELECT p.* FROM posts p " +
-                                        "JOIN category_post cp ON p.id = cp.post_id " +
-                                        "WHERE 1=1";
-                                if (!yearMonthInput.equalsIgnoreCase("all") && !endYearMonthInput.equalsIgnoreCase("all")) {
-                                    sql += " AND p.posting_time >= ? AND p.posting_time <= ?";
-                                }
-                                if (!category.isEmpty() && !category.equalsIgnoreCase("all")) {
-                                    sql += " AND cp.category = ?";
-                                }
-                                if (!key.isEmpty() && !key.equalsIgnoreCase("all")) {
-                                    sql += " AND (p.title LIKE ? OR p.content LIKE ?)";
-                                }
-
-                                PreparedStatement ps = con.prepareStatement(sql, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
-                                int paramIndex = 1;
-                                if (!yearMonthInput.equalsIgnoreCase("all") && !endYearMonthInput.equalsIgnoreCase("all")) {
-                                    String startDateTime = yearMonthInput + "-01 00:00:00";
-                                    String endDateTime = endYearMonthInput + "-31 23:59:59";
-                                    ps.setTimestamp(paramIndex++, Timestamp.valueOf(startDateTime));
-                                    ps.setTimestamp(paramIndex++, Timestamp.valueOf(endDateTime));
-                                }
-                                if (!category.isEmpty() && !category.equalsIgnoreCase("all")) {
-                                    ps.setString(paramIndex++, category);
-                                }
-                                if (!key.isEmpty() && !key.equalsIgnoreCase("all")) {
-                                    ps.setString(paramIndex++, "%" + key + "%");
-                                    ps.setString(paramIndex++, "%" + key + "%");
-                                }
-
+                            case "hot": {
+                                sql = "SELECT post_id, COUNT(post_id) AS times\n" +
+                                        "FROM search_record\n" +
+                                        "GROUP BY post_id\n" +
+                                        "ORDER BY times DESC\n" +
+                                        "LIMIT 10;";
+                                PreparedStatement ps = con.prepareStatement(sql);
                                 ResultSet rs = ps.executeQuery();
-                                printPost(rs);
-                                rs.beforeFirst();
-                                while (rs.next()){
-                                    stmtSearch.setInt(1,rs.getInt("id"));
-                                    stmtSearch.setString(2,authorName);
-                                    stmtSearch.addBatch();
+                                while (rs.next()) {
+                                    int postId = rs.getInt("post_id");
+                                    int times = rs.getInt("times");
+                                    writer.println("Post ID: " + postId + ", Times: " + times);
+                                    writer.flush();
                                 }
-                            } else {
-                                System.out.println("You have not logged in yet");
+                                writer.println("quit");
+                                writer.flush();
+                                break;
                             }
-                            break;
-                        }
 
-
-                        default: {
-//                            System.out.println("wrong command");
+                            default: {
+                                writer.println("wrong command");
+                                writer.flush();
+                                writer.println("quit");
+                                writer.flush();
+                                break;
+                            }
                         }
+                        stmtLike.executeBatch();
+                        stmtAuthor.executeBatch();
+                        stmtPost.executeBatch();
+                        stmtSecondReply.executeBatch();
+                        stmtReToSecRe.executeBatch();
+                        stmtFollow.executeBatch();
+                        stmtFavr.executeBatch();
+                        stmtReply.executeBatch();
+                        stmtShare.executeBatch();
+                        stmtCate.executeBatch();
+                        stmtSearch.executeBatch();
+                        con.commit();
+                    } else {
+                        isLogin = false;
+                        authorName = "";
+                        authorId = "";
+                        authorPhone = "";
+                        author_registration_time = "";
+                        writer.println("you log out successfully");
+                        writer.flush();
+                        writer.println("quit");
+                        writer.flush();
                     }
-                    stmtLike.executeBatch();
-                    stmtAuthor.executeBatch();
-                    stmtPost.executeBatch();
-                    stmtSecondReply.executeBatch();
-                    stmtReToSecRe.executeBatch();
-                    stmtFollow.executeBatch();
-                    stmtFavr.executeBatch();
-                    stmtReply.executeBatch();
-                    stmtShare.executeBatch();
-                    stmtCate.executeBatch();
-                    con.commit();
-                } else {
-                    isLogin = false;
-                    authorName = "";
-                    authorId = "";
-                    authorPhone = "";
-                    author_registration_time = "";
-                    System.out.println("you log out successfully");
+
                 }
 
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
             }
-
-        } catch (SQLException e) {
-            throw new RuntimeException(e);
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            e.printStackTrace();
         }
-//        closeDB();
-//        System.out.println(cnt + " records successfully loaded");
-//        System.out.println(end - start);
-//        System.out.println("Loading speed : " + (cnt * 1000L) / (end - start) + " records/s");
     }
 
     public static void printPost(ResultSet rs) throws SQLException {
         int count = 0;
         while (rs.next()) {
             count++;
-            System.out.print("PostID:" + rs.getInt("ID"));
-            System.out.println();
-            System.out.print("title:" + rs.getString("title"));
-            System.out.println();
-            System.out.print("content:" + rs.getString("content"));
-            System.out.println();
-            System.out.print("categories:");
+            writer.println("PostID:" + rs.getInt("ID"));
+            writer.flush();
+            writer.println("title:" + rs.getString("title"));
+            writer.flush();
+            writer.println("content:" + rs.getString("content"));
+            writer.flush();
+            writer.println("categories:");
+            writer.flush();
             //category
             String sql1 = "SELECT * from category_post where post_id = ?";
             PreparedStatement ps1 = con.prepareStatement(sql1);
             ps1.setInt(1, rs.getInt("ID"));
             ResultSet rs1 = ps1.executeQuery();
             while (rs1.next()) {
-                System.out.print(rs1.getString("category") + "/");
+                writer.println(rs1.getString("category") + "/");
+                writer.flush();
             }
-            System.out.println();
             //reply
-            System.out.print("number of like:");
+            writer.println("number of like:");
+            writer.flush();
             String sql2 = "SELECT count(*) from like_post where post_id = ? ";
             PreparedStatement ps2 = con.prepareStatement(sql2);
             ps2.setInt(1, rs.getInt("ID"));
             ResultSet rs2 = ps2.executeQuery();
             rs2.next();
-            System.out.print(rs2.getInt(1));
+            writer.println(rs2.getInt(1));
+            writer.flush();
             //favourite
-            System.out.println();
-            System.out.print("number of favourite:");
+            writer.println("number of favourite:");
+            writer.flush();
             String sql3 = "SELECT count(*) from author_favorited where post_id = ? ";
             PreparedStatement ps3 = con.prepareStatement(sql3);
             ps3.setInt(1, rs.getInt("ID"));
             ResultSet rs3 = ps3.executeQuery();
             rs3.next();
-            System.out.print(rs3.getInt(1));
-            System.out.println();
-            System.out.println("---------------------------------------------------------");
+            writer.println(rs3.getInt(1));
+            writer.flush();
+            writer.println("---------------------------------------------------------");
+            writer.flush();
+
         }
+        writer.println("quit");
+        writer.flush();
         if (count == 0) {
-            System.out.println("none");
+            writer.println("none");
+            writer.flush();
+            writer.println("quit");
+            writer.flush();
         }
     }
+    public static void printPost1(ResultSet rs) throws SQLException {
+        int count = 0;
+        while (rs.next()) {
+            count++;
+            writer.println("PostID:" + rs.getInt("ID"));
+            writer.flush();
+            writer.println("title:" + rs.getString("title"));
+            writer.flush();
+            writer.println("content:" + rs.getString("content"));
+            writer.flush();
+            writer.println("categories:");
+            writer.flush();
+            //category
+            String sql1 = "SELECT * from category_post where post_id = ?";
+            PreparedStatement ps1 = con.prepareStatement(sql1);
+            ps1.setInt(1, rs.getInt("ID"));
+            ResultSet rs1 = ps1.executeQuery();
+            while (rs1.next()) {
+                writer.println(rs1.getString("category") + "/");
+                writer.flush();
+            }
+            //reply
+            writer.println("number of like:");
+            writer.flush();
+            String sql2 = "SELECT count(*) from like_post where post_id = ? ";
+            PreparedStatement ps2 = con.prepareStatement(sql2);
+            ps2.setInt(1, rs.getInt("ID"));
+            ResultSet rs2 = ps2.executeQuery();
+            rs2.next();
+            writer.println(rs2.getInt(1));
+            writer.flush();
+            //favourite
+            writer.println("number of favourite:");
+            writer.flush();
+            String sql3 = "SELECT count(*) from author_favorited where post_id = ? ";
+            PreparedStatement ps3 = con.prepareStatement(sql3);
+            ps3.setInt(1, rs.getInt("ID"));
+            ResultSet rs3 = ps3.executeQuery();
+            rs3.next();
+            writer.println(rs3.getInt(1));
+            writer.flush();
+            writer.println("---------------------------------------------------------");
+            writer.flush();
 
-
-
+        }
+//        writer.println("quit");
+//        writer.flush();
+        if (count == 0) {
+            writer.println("none");
+            writer.flush();
+            writer.println("quit");
+            writer.flush();
+        }
+    }
 
 }

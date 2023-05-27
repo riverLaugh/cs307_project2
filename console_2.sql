@@ -17,7 +17,7 @@ create table posts
     content      varchar,
     posting_time timestamp,
     posting_city varchar,
-    author_name    varchar,
+    author_name  varchar,
     foreign key (author_name) references authors (author_name)
 );
 
@@ -32,7 +32,7 @@ create table second_replies
 
 create table replies
 (
-    reply_id    serial   primary key,
+    reply_id    serial primary key,
     postID      int,
     content     varchar,
     stars       int,
@@ -53,7 +53,7 @@ create table replies_to_second_replies
 create table author_followed
 (
     id                   serial primary key,
-    author_name            varchar,
+    author_name          varchar,
     followed_author_name varchar,
     foreign key (author_name) references authors (author_name),
     foreign key (followed_author_name) references authors (author_name),
@@ -105,10 +105,12 @@ create table blocklist
     blocked_name varchar,
     unique (author_name, blocked_name)
 );
-create table search_record(
-                              id serial,
-                              author_name  varchar,
-                              post_id int,
-                              foreign key (post_id) references posts(ID),
-                              foreign key (author_name) references authors (author_name)
+create table search_record
+(
+    id          serial,
+    author_name varchar,
+    post_id     int,
+    unique(author_name,post_id),
+    foreign key (post_id) references posts (ID),
+    foreign key (author_name) references authors (author_name)
 );
