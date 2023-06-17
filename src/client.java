@@ -12,8 +12,8 @@ public class client {
     public static void main(String[] args) {
         try {
             // 连接到服务端
-            socket = new Socket("localhost", 12345); // 假设服务端监听在localhost的12345端口
-
+//            socket = new Socket("10.25.4.145", 12345); // 假设服务端监听在localhost的12345端口
+            socket = new Socket("10.25.4.145",12345);
             // 初始化输入输出流
             reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             writer = new PrintWriter(socket.getOutputStream(), true);
@@ -22,7 +22,7 @@ public class client {
             BufferedReader userInputReader = new BufferedReader(new InputStreamReader(System.in));
 
             while (true) {
-                System.out.print("Enter command: ");
+                System.out.print("Input: ");
                 String command = userInputReader.readLine();
 
                 // 发送命令给服务端
